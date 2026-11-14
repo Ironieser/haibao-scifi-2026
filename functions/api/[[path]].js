@@ -1,6 +1,8 @@
 // 海豹杯 2026 获奖作品站 — Pages Functions 后端（/api/*）
 // 接口与表结构以 SPEC.md 为准；热门划线接口（/api/works/:id/marks）见下方 handleListMarks / handlePostMarks。
 
+import { handleView, handleViews, handleRecentComments } from '../../src/views.js';
+
 const WORK_IDS = new Set([
   'huidao-mingtian', 'zhuan-rengong', 'yiqie-ruchang', 'shuzi-shibolie',
   'dengdai-geduo', 'qinfen-de-heli', 'jingyinqu', 'taiyang-de-zangli',
@@ -9,6 +11,7 @@ const WORK_IDS = new Set([
   'shengri-dangao', 'suoluomen',
 ]);
 
+const VIEW_PAGES = new Set([...WORK_IDS, 'home', 'favorites', 'notes', 'stats', 'other']);
 const MAX_BODY = 8 * 1024;
 const DEVICE_RE = /^[A-Za-z0-9-]{8,64}$/;
 const STATS_TTL = 30;
@@ -541,6 +544,22 @@ async function route(context) {
     throw new HttpError(403, '不允许跨站请求');
   }
   if (!env.DB) throw new HttpError(500, '服务器未配置数据库');
+
+  // 浏览量与讨论动态（实现见 src/views.js）
+  const vctx = { request, env, waitUntil: (pr) => ctx.waitUntil(pr), json, errorResponse };
+  if (parts.length === 1 && parts[0] === 'view') {
+    if (method !== 'POST') return methodNotAllowed('POST');
+    const body = await readJson(request, { optional: true });
+    return handleView({ ...vctx, body, validPages: VIEW_PAGES });
+  }
+  if (parts.length === 1 && parts[0] === 'views') {
+    if (method !== 'GET') return methodNotAllowed('GET');
+    return handleViews(vctx);
+  }
+  if (parts.length === 2 && parts[0] === 'comments' && parts[1] === 'recent') {
+    if (method !== 'GET') return methodNotAllowed('GET');
+    return handleRecentComments(vctx);
+  }
 
   // GET /api/stats
   if (parts.length === 1 && parts[0] === 'stats') {

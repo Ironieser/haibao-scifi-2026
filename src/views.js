@@ -48,6 +48,10 @@ async function flush(env) {
     ).bind(day, actor));
     stmts.push(env.DB.prepare("INSERT OR IGNORE INTO visitors (day, actor) VALUES (?1, ?2)").bind(day, actor));
   }
+  // 偶尔清理两天前的去重记录（按主键前缀范围删除）
+  if (Math.random() < 0.02) {
+    stmts.push(env.DB.prepare("DELETE FROM visitors WHERE day < ?1").bind(dayCN(Date.now() - 2 * 86400 * 1000)));
+  }
   // D1 batch 单次语句数有限，分块提交
   for (let i = 0; i < stmts.length; i += 90) {
     await env.DB.batch(stmts.slice(i, i + 90));
@@ -102,6 +106,21 @@ export async function handleViews({ request, env, waitUntil, json }) {
   }
   const res = json({ total, today: { pv: pvMap[today] || 0, uv: uvMap[today] || 0 }, pages: pageMap, series }, 200,
     { "Cache-Control": `public, max-age=${VIEWS_TTL}` });
+  waitUntil(cache.put(key, res.clone()));
+  return res;
+}
+
+// GET /api/comments/recent → 最新 8 条可见评论（全站），供首页「讨论动态」。按主键倒序，只读少量行；边缘缓存 30 秒。
+export async function handleRecentComments({ request, env, waitUntil, json }) {
+  const cache = caches.default;
+  const key = new Request(new URL("/api/comments/recent", request.url).toString(), { method: "GET" });
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const { results } = await env.DB.prepare(
+    "SELECT id, work, name, body, created FROM comments WHERE deleted = 0 ORDER BY id DESC LIMIT 8"
+  ).all();
+  const comments = results.map((r) => ({ ...r, body: r.body.length > 120 ? r.body.slice(0, 120) + "…" : r.body }));
+  const res = json({ comments }, 200, { "Cache-Control": "public, max-age=30" });
   waitUntil(cache.put(key, res.clone()));
   return res;
 }

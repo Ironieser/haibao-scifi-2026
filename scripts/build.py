@@ -359,6 +359,7 @@ def shell(ctx, *, title, desc, path, page, body, body_attrs="", og_type="website
 {font_preload}<link rel="stylesheet" href="/assets/site.css?v={ctx.css_v}">
 <script>{HEAD_JS}</script>
 <script src="/assets/site.js?v={ctx.js_v}" defer></script>
+<script src="/assets/views.js?v={getattr(ctx, 'views_v', '')}" defer></script>
 {extra_head}</head>
 <body data-page="{page}"{body_attrs}>
 <a class="skip" href="#main">跳到正文</a>
@@ -388,6 +389,7 @@ def footer(ctx):
     return f"""<footer class="foot"><div class="wrap">
 <p class="foot-ann">「{esc(c['name'])}获奖名单」由{esc(c['announcedBy'])}于 {esc(when)} 发布。</p>
 <blockquote><p>{esc(c['aiNote'])}</p></blockquote>
+<p class="foot-views" data-views-box hidden>全站累计浏览 <b data-views="total"></b> 次，今日 <b data-views="today-uv"></b> 位读者。<a href="/stats/">访问统计</a></p>
 <p>作品版权归作者所有，本站仅供阅读与交流。</p>
 <p>展示字体：得意黑（<a href="/assets/fonts/OFL.txt">OFL</a>）。</p>
 <div class="theme-sw js-only" role="group" aria-label="外观"><span>外观</span>
@@ -696,7 +698,7 @@ def build_work(ctx, meta, works, by_id, w):
 <ul class="stamps" aria-label="获奖">{stamps}</ul>
 <h1 class="work-title" id="work-title">{esc(title_disp)}</h1>
 <p class="work-author"><span class="sr">作者：</span>{esc(w['author'])}</p>
-<p class="work-meta"><span>{fmt_chars(w['chars'])}</span><span>{fmt_minutes(w['chars'])}读完</span><span>{ai_meta}</span></p>
+<p class="work-meta"><span>{fmt_chars(w['chars'])}</span><span>{fmt_minutes(w['chars'])}读完</span><span>{ai_meta}</span><span data-views-box hidden>阅读 <b data-views-page="{w['id']}"></b> 次</span></p>
 <div class="actions">
 <button type="button" class="act act-like js-only" id="act-like" aria-pressed="false">{ICON['heart']}<span class="l">点赞</span><span class="c"></span></button>
 <button type="button" class="act act-fav js-only" id="act-fav" aria-pressed="false">{ICON['star']}<span class="l">收藏</span><span class="c"></span></button>
@@ -901,8 +903,36 @@ def build_assets(ctx):
     js = (SRC / "site.js").read_text("utf-8")
     ctx.css_v = sha8(css.encode())
     ctx.js_v = sha8(js.encode())
+    vjs = (SRC / "views.js").read_bytes()
+    ctx.views_v = sha8(vjs)
+    write(DIST / "assets" / "views.js", vjs)
     write(DIST / "assets" / "site.css", css)
     write(DIST / "assets" / "site.js", js)
+
+
+def build_stats(ctx, meta, works):
+    """/stats/ 公开访问统计页：总浏览、今日浏览与访客、近 30 天走势、作品阅读排行（数据由 views.js 从 /api/views 填入）。"""
+    data = json.dumps([{"id": w["id"], "title": plain(w["title"]), "author": w["author"]} for w in works],
+                      ensure_ascii=False).replace("</", "<\\/")
+    body = f"""<main id="main" class="wrap stats-page">
+<h1 class="pg-h">访问统计</h1>
+<p class="sec-intro">本站自己统计的浏览量，所有人可见。每打开一次页面算一次浏览；同一设备一天内只算一位读者。数字约每分钟更新。</p>
+<div class="v-nums" data-views-box hidden>
+<div><b data-views="total"></b><span>累计浏览</span></div>
+<div><b data-views="today-pv"></b><span>今日浏览</span></div>
+<div><b data-views="today-uv"></b><span>今日读者</span></div>
+</div>
+<noscript><p>访问统计需要启用 JavaScript。</p></noscript>
+<section aria-labelledby="v-trend-h"><h2 id="v-trend-h" class="v-h">近 30 天</h2>
+<p class="v-legend"><span class="k-pv">浏览</span><span class="k-uv">读者</span></p>
+<div id="views-chart" class="v-chart"></div></section>
+<section aria-labelledby="v-rank-h"><h2 id="v-rank-h" class="v-h">作品阅读排行</h2>
+<ol id="views-rank" class="v-rank"></ol></section>
+</main>
+<script type="application/json" id="works-data">{data}</script>"""
+    write(DIST / "stats" / "index.html",
+          shell(ctx, title="访问统计｜海豹杯 2026", desc="海豹杯 2026 获奖作品站的公开访问统计：累计浏览、每日读者与作品阅读排行。",
+                path="/stats/", page="stats", body=body))
 
 
 def main():
@@ -913,6 +943,7 @@ def main():
     build_assets(ctx)
     hero_art = build_art(works)
     build_home(ctx, meta, works, by_id, hero_art)
+    build_stats(ctx, meta, works)
     for w in works:
         build_work(ctx, meta, works, by_id, w)
     build_favorites(ctx, meta, works)

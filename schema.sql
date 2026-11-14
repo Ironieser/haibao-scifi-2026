@@ -17,3 +17,8 @@ CREATE TABLE IF NOT EXISTS mark_counts (work TEXT NOT NULL, p INTEGER NOT NULL, 
 -- 热门段落查询（WHERE work = ? AND n >= 2 ORDER BY n DESC LIMIT 50）走此部分索引：只读取前 50 条，
 -- 且只有 n >= 2 的段落进入索引（大多数段落 n <= 1，不产生额外写入）。
 CREATE INDEX IF NOT EXISTS mark_counts_top ON mark_counts (work, n) WHERE n >= 2;
+
+-- 浏览量（src/views.js）：PV 按页面×天聚合；UV 按天计数，visitors 用于去重
+CREATE TABLE IF NOT EXISTS views (page TEXT NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (page, day)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS uv (day TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS visitors (day TEXT NOT NULL, actor TEXT NOT NULL, PRIMARY KEY (day, actor)) WITHOUT ROWID;
