@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # /api/* 冒烟测试。先启动本地服务：
-#   npx -y wrangler@4 d1 execute haibao --local --file=schema.sql
-#   npx -y wrangler@4 pages dev dist --port 8788
-# 然后：bash scripts/test_api.sh [BASE]
-# 依赖 curl、jq。会写入测试数据（点赞、评论），测完请清理本地 D1。
+#   npx -y wrangler@4 d1 execute haibao --local -c wrangler.worker.jsonc --file=schema.sql -y
+#   npx -y wrangler@4 dev -c wrangler.worker.jsonc --local --port 8790
+# 然后：bash scripts/test_api.sh http://localhost:8790
+# 依赖 curl、jq。会写入测试数据（点赞、评论、划线计数、限流），测完请清理本地 D1：
+#   npx -y wrangler@4 d1 execute haibao --local -c wrangler.worker.jsonc -y --command \
+#     "DELETE FROM reactions; DELETE FROM counters; DELETE FROM comments; DELETE FROM comment_likes; DELETE FROM ratelimit; DELETE FROM marks; DELETE FROM mark_counts;"
+# 热门划线接口有 60 秒边缘缓存，脚本里每个作品只在写完之后才第一次 GET。
 # 由于 IP 限流（15 秒 1 条），整个脚本约需 35 秒。
 set -u
 
@@ -174,6 +177,83 @@ req DELETE /api/comments/$R1 "" -H "Authorization: Bearer $ADMIN_TOKEN"
 check "删除已不可见的回复（不应重复扣减计数）" '.ok == true'
 req GET "/api/works/$WORK/comments"
 check "删除生效（列表为空）" '.comments == [] and .more == false'
+
+
+echo "== 热门划线"
+MW="yiqie-ruchang"
+TS=$(date +%s)
+M1="test-mark-a-$TS"; M2="test-mark-b-$TS"; M3="test-mark-c-$TS"
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":5,\"on\":true}"
+check "划线计数 +1" '.on == true and .p == 5 and .n == 1'
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":5,\"on\":true}"
+check "同一设备同一段重复划线幂等（仍为 1）" '.n == 1'
+req POST /api/works/$MW/marks "{\"device\":\"$M2\",\"p\":5,\"on\":true}"
+check "另一设备 -> 2" '.n == 2'
+req POST /api/works/$MW/marks "{\"device\":\"$M3\",\"p\":[5,7,9],\"on\":true}"
+check "跨段划线（数组）" '.on == true and (.items | map(.p)) == [5,7,9] and (.items | map(.n)) == [3,1,1]'
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":[7,9,9],\"on\":true}"
+check "数组去重，第 7、9 段 -> 2" '(.items | map([.p,.n])) == [[7,2],[9,2]]'
+req POST /api/works/$MW/marks "{\"device\":\"$M2\",\"p\":12,\"on\":true}"
+check "第 12 段只有 1 人" '.n == 1'
+par /api/works/$MW/marks "{\"device\":\"$M2\",\"p\":20,\"on\":true}"
+check "并行 10 次同一段划线，计数为 1" 'length == 10 and all(.[]; .n == 1)'
+req GET /api/works/$MW/marks
+check "热门段落：n>=2，按 n 降序" '.top[0] == {"p":5,"n":3} and (.top | map(.p) | sort) == [5,7,9] and all(.top[]; .n >= 2)'
+MC=$(curl -s -D - -o /dev/null "$BASE/api/works/$MW/marks" | tr -d '\r' | awk -F': ' 'tolower($1)=="cache-control"{print $2}')
+[ "$MC" = "public, max-age=60" ] && { PASS=$((PASS+1)); echo "  [PASS] marks Cache-Control: $MC"; } \
+  || { FAIL=$((FAIL+1)); echo "  [FAIL] marks Cache-Control: '$MC'"; }
+req POST /api/works/$MW/marks "{\"device\":\"$M3\",\"p\":5,\"on\":false}"
+check "删光该段划线 -> 计数 -1" '.on == false and .n == 2'
+req POST /api/works/$MW/marks "{\"device\":\"$M3\",\"p\":5,\"on\":false}"
+check "重复取消幂等（仍为 2）" '.n == 2'
+req POST /api/works/$MW/marks "{\"device\":\"$M2\",\"p\":12,\"on\":false}"
+check "计数归零（行被删除，返回 0）" '.n == 0'
+req POST /api/works/$MW/marks "{\"device\":\"$M2\",\"p\":12,\"on\":false}"
+check "未划过的段取消 -> 仍为 0" '.n == 0'
+req GET /api/works/$MW/marks
+check "GET 命中 60 秒缓存（仍是上一次结果）" '.top[0] == {"p":5,"n":3}'
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":0,\"on\":true}"
+check "p=0 -> 400" '.error | type == "string"' 400
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":1.5,\"on\":true}"
+check "p 非整数 -> 400" '.error | type == "string"' 400
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":\"3\",\"on\":true}"
+check "p 为字符串 -> 400" '.error | type == "string"' 400
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":99999,\"on\":true}"
+check "p 超出范围 -> 400" '.error | type == "string"' 400
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":[],\"on\":true}"
+check "空数组 -> 400" '.error | type == "string"' 400
+P31=$(seq 1 31 | paste -sd, -)
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":[$P31],\"on\":true}"
+check "一次超过 30 段 -> 400" '.error | type == "string"' 400
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":5}"
+check "缺少 on -> 400" '.error | type == "string"' 400
+req POST /api/works/no-such-work/marks "{\"device\":\"$M1\",\"p\":5,\"on\":true}"
+check "非法作品 id -> 404" '.error | type == "string"' 404
+req GET /api/works/no-such-work/marks
+check "非法作品 id GET -> 404" '.error | type == "string"' 404
+req DELETE /api/works/$MW/marks
+check "错误方法 -> 405" '.error | type == "string"' 405
+req POST /api/works/$MW/marks "{\"device\":\"$M1\",\"p\":5,\"on\":true}" -H 'Origin: https://evil.example'
+check "跨站 Origin -> 403" '.error | type == "string"' 403
+
+echo "== 划线限流（同一设备每天 300 次，按段计）"
+MR="test-mark-r-$TS"; MW2="gongzuo"
+P30=$(seq 1 30 | paste -sd, -)
+RL_OK=y
+for i in $(seq 1 10); do
+  ON=$([ $((i % 2)) -eq 1 ] && echo true || echo false)
+  out=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/works/$MW2/marks" -H 'Content-Type: application/json' \
+    -H "Origin: $BASE" --data-binary "{\"device\":\"$MR\",\"p\":[$P30],\"on\":$ON}")
+  [ "$out" = "200" ] || RL_OK=n
+done
+[ "$RL_OK" = y ] && { PASS=$((PASS+1)); echo "  [PASS] 前 300 次（10 × 30 段）全部成功"; } \
+  || { FAIL=$((FAIL+1)); echo "  [FAIL] 前 300 次中有失败"; }
+req POST /api/works/$MW2/marks "{\"device\":\"$MR\",\"p\":3,\"on\":true}"
+check "第 301 次 -> 429" '.error | test("上限")' 429
+req POST /api/works/$MW2/marks "{\"device\":\"$M1\",\"p\":3,\"on\":true}"
+check "其他设备不受影响" '.n == 1'
+req GET /api/works/$MW2/marks
+check "超限请求没有写入（第 3 段只有 1 人，不在热门里）" '.top == []'
 
 echo "== stats"
 req GET /api/stats

@@ -2,7 +2,7 @@
 
 用法：python3 -I scripts/build.py
 只用标准库。读取 data/works.json 与 content/works/*.json，写出：
-  dist/index.html, dist/works/<id>/index.html, dist/favorites/index.html, dist/404.html,
+  dist/index.html, dist/works/<id>/index.html, dist/favorites/index.html, dist/notes/index.html, dist/404.html,
   dist/assets/site.css, dist/assets/site.js, dist/_headers, dist/robots.txt,
   dist/sitemap.xml, dist/favicon.svg
 不会删除 dist/downloads/ 与 dist/assets/fonts/（其他脚本的产物）。
@@ -278,12 +278,17 @@ ICON = {
     "share": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M6 12v8h12v-8"/></svg>',
 }
 
-# 首屏前执行：应用主题/字体/字号偏好，并标记 JS 可用（CSP 用哈希放行）
+# 首屏前执行：应用阅读偏好（主题/背景/字体/字号/行距/页宽/对齐），并标记 JS 可用。
+# 取值与 site.js 的 prefs() 一致。CSP 用 HEAD_JS_HASH 放行：改动这里后哈希自动重算并写入 dist/_headers。
 HEAD_JS = ("(function(){var d=document.documentElement;d.className+=' js';try{"
            "var p=JSON.parse(localStorage.getItem('hb.prefs')||'{}')||{};"
            "if(p.theme==='light'||p.theme==='dark')d.setAttribute('data-theme',p.theme);"
-           "if(p.font==='sans')d.setAttribute('data-font','sans');"
-           "var s=parseInt(p.size,10);if(s>=15&&s<=26)d.style.setProperty('--read-size',s+'px');"
+           "if(p.font==='sans'||p.font==='kai')d.setAttribute('data-font',p.font);"
+           "var s=parseInt(p.size,10);if(s>=14&&s<=26)d.style.setProperty('--read-size',s+'px');"
+           "if(p.lh==='tight'||p.lh==='loose')d.setAttribute('data-lh',p.lh);"
+           "if(p.width==='narrow'||p.width==='wide')d.setAttribute('data-width',p.width);"
+           "if(p.bg==='green'||p.bg==='sepia')d.setAttribute('data-bg',p.bg);"
+           "if(p.justify===false)d.setAttribute('data-justify','off');"
            "}catch(e){}})();")
 HEAD_JS_HASH = "sha256-" + base64.b64encode(hashlib.sha256(HEAD_JS.encode()).digest()).decode()
 
@@ -311,10 +316,11 @@ def og_image_tags(path):
 EXTRA_ASSETS = ("reader.css", "reader.js", "share.css", "share.js", "vendor/qrcode.js")
 
 
-def extra_asset_tags():
-    """作品页额外资源：阅读增强（reader.*）与分享（share.*、vendor/qrcode.js）。源文件在 scripts/assets/，缺失则跳过。"""
+def extra_asset_tags(names=EXTRA_ASSETS):
+    """作品页额外资源：阅读增强（reader.*）与分享（share.*、vendor/qrcode.js）。源文件在 scripts/assets/，缺失则跳过。
+    「我的笔记」页只用 reader.*。"""
     tags = []
-    for name in EXTRA_ASSETS:
+    for name in names:
         src = ROOT / "scripts" / "assets" / name
         if not src.exists():
             continue
@@ -366,10 +372,12 @@ def shell(ctx, *, title, desc, path, page, body, body_attrs="", og_type="website
 
 
 def masthead(page):
-    fav = ' aria-current="page"' if page == "favorites" else ""
-    return f"""<header class="masthead"><div class="wrap masthead-in">
-<a class="brand" href="/">{SEAL_SVG}海豹杯 2026</a>
-<nav class="nav" aria-label="主导航"><a href="/#awards">获奖名单</a><a href="/#works">全部作品</a><a href="/favorites/"{fav}>我的收藏</a></nav>
+    cur = lambda p: ' aria-current="page"' if page == p else ""
+    # 窄屏只显示后两个字（「名单 / 作品 / 收藏 / 笔记」），前缀对读屏软件仍可见
+    ch = '<p class="mh-ch" id="mh-ch" aria-hidden="true"></p>\n' if page == "work" else ""
+    return f"""<header class="masthead" id="masthead"><div class="wrap masthead-in">
+<a class="brand" href="/">{SEAL_SVG}<span class="brand-t">海豹杯 2026</span></a>
+{ch}<nav class="nav" aria-label="主导航"><a href="/#awards"><span class="nx">获奖</span>名单</a><a href="/#works"><span class="nx">全部</span>作品</a><a href="/favorites/"{cur("favorites")}><span class="nx">我的</span>收藏</a><a href="/notes/"{cur("notes")}><span class="nx">我的</span>笔记</a></nav>
 </div></header>"""
 
 
@@ -727,17 +735,13 @@ def build_work(ctx, meta, works, by_id, w):
 </div>
 </article>
 </main>
-<div class="dock js-only" aria-label="阅读工具">
+<div class="dock js-only" role="group" aria-label="阅读工具">
+<p class="dock-pct" id="dock-pct" hidden><b class="n"></b><span class="t"></span></p>
 {'<button type="button" data-panel="panel-toc" aria-expanded="false" aria-controls="panel-toc">目录</button>' if toc else ''}
 <button type="button" data-panel="panel-set" aria-expanded="false" aria-controls="panel-set" aria-label="阅读设置">Aa</button>
 </div>
 {panel_toc}
-<div class="panel" id="panel-set" role="dialog" aria-label="阅读设置" hidden>
-<h2>阅读设置</h2>
-<div class="prow"><span>字号</span><span class="opts"><button type="button" data-size="-1" aria-label="缩小字号">A-</button><output id="size-out">18px</output><button type="button" data-size="1" aria-label="放大字号">A+</button></span></div>
-<div class="prow"><span>字体</span><span class="opts"><button type="button" data-pref="font" data-val="serif">宋体</button><button type="button" data-pref="font" data-val="sans">黑体</button></span></div>
-<div class="prow"><span>外观</span><span class="opts"><button type="button" data-pref="theme" data-val="auto">自动</button><button type="button" data-pref="theme" data-val="light">浅色</button><button type="button" data-pref="theme" data-val="dark">深色</button></span></div>
-</div>"""
+{settings_panel()}"""
     awards_txt = "、".join(award_full(a) for a in w["awards"])
     desc = f"《{plain(w['title'])}》，{w['author']}著，{awards_txt}。{excerpt(ct)}"
     title = f"《{plain(w['title'])}》{w['author']}｜海豹杯 2026"
@@ -745,6 +749,33 @@ def build_work(ctx, meta, works, by_id, w):
           shell(ctx, title=title, desc=desc, path=f"/works/{wid}/", page="work", body=body,
                 body_attrs=f' data-work="{wid}"', og_type="article",
                 extra_head=work_meta_json(w) + extra_asset_tags() + "\n"))
+
+
+def settings_panel():
+    """阅读设置面板。按钮的 data-pref/data-val 与 site.js 的 prefs() 字段一一对应，所有设置存 hb.prefs。"""
+    def opts(key, label, items):
+        bts = "".join(f'<button type="button" data-pref="{key}" data-val="{v}" aria-pressed="false">{esc(t)}</button>'
+                      for v, t in items)
+        return (f'<div class="prow" role="group" aria-labelledby="pl-{key}"><span id="pl-{key}">{esc(label)}</span>'
+                f'<span class="opts">{bts}</span></div>')
+
+    def switch(key, label, hint):
+        return (f'<div class="prow"><span id="pl-{key}">{esc(label)}</span>'
+                f'<button type="button" class="sw-btn" role="switch" aria-checked="true" data-toggle="{key}" '
+                f'aria-labelledby="pl-{key}" aria-describedby="ph-{key}"><span class="sw-k" aria-hidden="true"></span></button>'
+                f'<span class="sr" id="ph-{key}">{esc(hint)}</span></div>')
+
+    return ('<div class="panel panel-set" id="panel-set" role="dialog" aria-label="阅读设置" hidden>\n<h2>阅读设置</h2>\n'
+            '<div class="prow"><label for="set-size">字号</label><span class="rng">'
+            '<input type="range" id="set-size" min="14" max="26" step="1" value="18">'
+            '<output id="size-out" for="set-size">18px</output></span></div>\n'
+            + opts("lh", "行距", [("tight", "紧"), ("normal", "适中"), ("loose", "宽松")]) + "\n"
+            + opts("width", "页宽", [("narrow", "窄"), ("mid", "中"), ("wide", "宽")]) + "\n"
+            + opts("font", "字体", [("serif", "宋体"), ("sans", "黑体"), ("kai", "楷体")]) + "\n"
+            + opts("bg", "背景", [("paper", "纸色"), ("green", "护眼绿"), ("sepia", "羊皮"), ("night", "夜间")]) + "\n"
+            + switch("justify", "两端对齐", "关闭后正文左对齐") + "\n"
+            + switch("hot", "热门划线", "在多人划过的段落旁显示人数") + "\n"
+            + '<p class="pnote">快捷键：← → 或空格翻屏，J / K 下一章、上一章。</p>\n</div>')
 
 
 def work_meta_json(w):
@@ -781,6 +812,36 @@ def build_favorites(ctx, meta, works):
           shell(ctx, title="我的收藏｜海豹杯 2026", desc="你在本设备上收藏的海豹杯 2026 获奖作品。",
                 path="/favorites/", page="favorites", body=body,
                 extra_head='<meta name="robots" content="noindex">\n'))
+
+
+def build_notes(ctx, works):
+    data = [{"id": w["id"], "title": plain(w["title"]), "author": w["author"], "order": w["order"]} for w in works]
+    js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    body = f"""<main id="main" class="wrap">
+<header class="page-head"><h1>我的笔记</h1><p id="notes-count">划线和笔记保存在这台设备的浏览器里，不会上传。</p></header>
+<noscript><p class="fav-empty">「我的笔记」需要启用 JavaScript。</p></noscript>
+<div class="notes-bar js-only" id="notes-bar" hidden>
+<button type="button" class="btn" id="notes-export">导出 Markdown</button>
+<button type="button" class="btn btn-quiet" id="notes-copy">复制全部</button>
+</div>
+<div class="notes-list js-only" id="notes-list" hidden></div>
+<div class="fav-empty notes-empty js-only" id="notes-empty">
+<p>还没有划线或笔记。</p>
+<ol>
+<li>打开任意一部作品，在正文里长按（电脑上用鼠标拖选）选中一段文字；</li>
+<li>选区下方会出现工具条：点「划线」标出这段话，点「笔记」写下你的想法；</li>
+<li>回到这里，就能按作品看到全部划线和笔记，也可以导出为 Markdown。</li>
+</ol>
+<p class="muted">划线和笔记只保存在这台设备的浏览器里；换手机、换浏览器或清除浏览数据后不会保留，记得定期导出。</p>
+<a class="btn fav-go" href="/#works">去读一部作品</a>
+</div>
+<script type="application/json" id="works-data">{js}</script>
+</main>"""
+    write(DIST / "notes" / "index.html",
+          shell(ctx, title="我的笔记｜海豹杯 2026", desc="你在本设备上的划线与笔记。",
+                path="/notes/", page="notes", body=body,
+                extra_head='<meta name="robots" content="noindex">\n'
+                + extra_asset_tags(("reader.css", "reader.js")) + "\n"))
 
 
 def build_404(ctx):
@@ -855,6 +916,7 @@ def main():
     for w in works:
         build_work(ctx, meta, works, by_id, w)
     build_favorites(ctx, meta, works)
+    build_notes(ctx, works)
     build_404(ctx)
     build_static(works)
     print(f"built {len(works)} works -> {DIST.relative_to(ROOT)}/ (css {ctx.css_v}, js {ctx.js_v}, font {ctx.font_v or 'missing'})")

@@ -74,7 +74,7 @@ def home_card(hero_png, font, meta, dest, tmp):
     # 插画靠右，左侧留给套印标题
     base = tmp / "home-base.png"
     run("magick", "-size", "1200x630", f"xc:{PAPER}",
-        "(", hero_png, "-resize", "860x", ")", "-gravity", "east", "-geometry", "+0+0", "-composite", base)
+        "(", hero_png, "-fuzz", "2%", "-fill", PAPER, "-opaque", "white", "-resize", "860x", ")", "-gravity", "east", "-geometry", "+0+0", "-composite", base)
     layers = []
     for color, dx, dy, name in ((PINK, 0, 0, "p"), (BLUE, 5, -4, "b")):
         layer = tmp / f"home-{name}.png"

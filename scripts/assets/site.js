@@ -92,41 +92,101 @@
   }
   function fmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
-  /* ---------- 偏好：主题 / 字号 / 字体 ---------- */
-  var SIZE_MIN = 15, SIZE_MAX = 26, SIZE_DEF = 18;
+  /* ---------- 偏好：阅读设置（全站只有这一套，存 hb.prefs） ----------
+     head 内联脚本（build.py 的 HEAD_JS）在首屏前按同样的取值设置 html 属性，避免闪烁。 */
+  var SIZE_MIN = 14, SIZE_MAX = 26, SIZE_DEF = 18;
+  function pick(v, list, def) { return list.indexOf(v) >= 0 ? v : def; }
   function prefs() {
     var p = jget('hb.prefs', {});
     if (!p || typeof p !== 'object') p = {};
     var size = parseInt(p.size, 10);
     return {
       size: size >= SIZE_MIN && size <= SIZE_MAX ? size : SIZE_DEF,
-      font: p.font === 'sans' ? 'sans' : 'serif',
-      theme: p.theme === 'light' || p.theme === 'dark' ? p.theme : 'auto'
+      font: pick(p.font, ['serif', 'sans', 'kai'], 'serif'),
+      theme: pick(p.theme, ['auto', 'light', 'dark'], 'auto'),
+      lh: pick(p.lh, ['tight', 'normal', 'loose'], 'normal'),
+      width: pick(p.width, ['narrow', 'mid', 'wide'], 'mid'),
+      bg: pick(p.bg, ['paper', 'green', 'sepia'], 'paper'),   // 「夜间」= theme dark
+      justify: p.justify !== false,
+      hot: p.hot !== false
     };
   }
+  var darkMq = W.matchMedia ? W.matchMedia('(prefers-color-scheme: dark)') : null;
+  function isDark(p) { return p.theme === 'dark' || (p.theme === 'auto' && !!(darkMq && darkMq.matches)); }
+  function attr(name, v) { if (v === null) H.removeAttribute(name); else H.setAttribute(name, v); }
   function applyPrefs(p) {
-    if (p.theme === 'auto') H.removeAttribute('data-theme'); else H.setAttribute('data-theme', p.theme);
-    if (p.font === 'sans') H.setAttribute('data-font', 'sans'); else H.removeAttribute('data-font');
+    attr('data-theme', p.theme === 'auto' ? null : p.theme);
+    attr('data-font', p.font === 'serif' ? null : p.font);
+    attr('data-lh', p.lh === 'normal' ? null : p.lh);
+    attr('data-width', p.width === 'mid' ? null : p.width);
+    attr('data-bg', p.bg === 'paper' ? null : p.bg);
+    attr('data-justify', p.justify ? null : 'off');
     H.style.setProperty('--read-size', p.size + 'px');
+    var dark = isDark(p);
     $$('[data-pref]').forEach(function (b) {
-      var k = b.getAttribute('data-pref'), v = b.getAttribute('data-val');
-      b.setAttribute('aria-pressed', String(String(p[k]) === v));
+      var k = b.getAttribute('data-pref'), v = b.getAttribute('data-val'), on;
+      if (k === 'bg') on = v === 'night' ? dark : (!dark && p.bg === v);
+      else on = String(p[k]) === v;
+      b.setAttribute('aria-pressed', String(on));
     });
+    $$('[data-toggle]').forEach(function (b) { b.setAttribute('aria-checked', String(!!p[b.getAttribute('data-toggle')])); });
+    var rng = $('#set-size');
+    if (rng && String(rng.value) !== String(p.size)) rng.value = p.size;
     var out = $('#size-out');
     if (out) out.textContent = p.size + 'px';
+    try { D.dispatchEvent(new CustomEvent('hb:prefs', { detail: p })); } catch (e) {}
   }
   function savePrefs(p) { jset('hb.prefs', p); applyPrefs(p); }
   D.addEventListener('click', function (ev) {
-    var b = ev.target.closest && ev.target.closest('[data-pref]');
+    var b = ev.target.closest && ev.target.closest('[data-pref], [data-toggle]');
     if (!b) return;
     var p = prefs();
-    p[b.getAttribute('data-pref')] = b.getAttribute('data-val');
+    if (b.hasAttribute('data-toggle')) {
+      var tk = b.getAttribute('data-toggle');
+      p[tk] = !p[tk];
+    } else {
+      var k = b.getAttribute('data-pref'), v = b.getAttribute('data-val');
+      if (k === 'bg') {
+        if (v === 'night') p.theme = 'dark';
+        else { p.bg = v; if (isDark(p)) p.theme = 'light'; }
+      } else p[k] = v;
+    }
     keepPosition(function () { savePrefs(p); });
   });
+  var sizeRange = $('#set-size');
+  if (sizeRange) {
+    // 手机上最小 16px（CSS 同样兜底）
+    if (W.matchMedia && W.matchMedia('(max-width: 719px)').matches) sizeRange.min = '16';
+    sizeRange.addEventListener('input', function () {
+      var p = prefs();
+      p.size = Math.max(SIZE_MIN, Math.min(SIZE_MAX, parseInt(sizeRange.value, 10) || SIZE_DEF));
+      keepPosition(function () { savePrefs(p); });
+    });
+  }
+  if (darkMq) {
+    var onMq = function () { applyPrefs(prefs()); };
+    if (darkMq.addEventListener) darkMq.addEventListener('change', onMq); else if (darkMq.addListener) darkMq.addListener(onMq);
+  }
+
+  /* 改设置时保持阅读位置（作品页由 initReading 替换为段落级实现） */
+  var keepPosition = function (fn) { fn(); };
   applyPrefs(prefs());
 
-  /* 改字号/字体时保持阅读位置 */
-  var keepPosition = function (fn) { fn(); };
+  /* 阅读位置：新格式 {"p":段落编号,"o":段内偏移比例,"r":全文比例,"t":时间}；兼容旧格式（0–1 的比例字符串） */
+  function readPos(wid) {
+    var raw = rawGet('hb.read.' + wid);
+    if (raw === null || raw === '') return null;
+    if (/^\s*\{/.test(raw)) {
+      try {
+        var o = JSON.parse(raw);
+        if (!o || typeof o !== 'object') return null;
+        var r = parseFloat(o.r);
+        return { p: parseInt(o.p, 10) || 0, o: Math.max(0, Math.min(1, parseFloat(o.o) || 0)), r: r >= 0 && r <= 1 ? r : 0 };
+      } catch (e) { return null; }
+    }
+    var x = parseFloat(raw);
+    return x >= 0 && x <= 1 ? { p: 0, o: 0, r: x, legacy: true } : null;
+  }
 
   /* ---------- 首页 ---------- */
   function initHome() {
@@ -273,56 +333,190 @@
     });
   }
 
-  /* ---------- 阅读：进度条、继续阅读、设置、目录 ---------- */
+  /* ---------- 阅读：进度、继续阅读、面板、章节、沉浸顶栏、键盘翻页 ---------- */
+  var TOP_LINE = 72;  // 视口顶部基准线（与 scroll-margin-top 一致，避开顶栏）
   function initReading(id) {
     var text = $('#text'), bar = $('#progress');
     if (!text) return;
     var key = 'hb.read.' + id;
-    function geom() {
-      var top = text.getBoundingClientRect().top + W.pageYOffset;
-      return { top: top, h: Math.max(1, text.offsetHeight) };
+    var mast = $('#masthead'), mhCh = $('#mh-ch'), dockPct = $('#dock-pct');
+    var titleEl = $('#work-title');
+    var heads = $$('h2.ch', text);
+    var headNames = heads.map(function (h) { return (h.textContent || '').replace(/#\s*$/, '').trim(); });
+    var workName = titleEl ? '《' + titleEl.textContent.trim() + '》' : '';
+    var tocLinks = {};
+    $$('#panel-toc a').forEach(function (a) { tocLinks[a.getAttribute('href').slice(1)] = a; });
+
+    /* 每个块（段落、章节标题、表格…）的字数前缀和：用于阅读百分比与剩余时间（500 字/分钟） */
+    var blocks = Array.prototype.slice.call(text.children).filter(function (b) { return b.offsetParent !== null || b.getClientRects().length; });
+    var lens = blocks.map(function (b) { return (b.textContent || '').replace(/\s+/g, '').length; });
+    var cum = [], total = 0;
+    lens.forEach(function (n) { cum.push(total); total += n; });
+    total = Math.max(1, total);
+
+    /* 布局缓存：块相对 #text 顶部的位置；#text 尺寸变化（字号、行距、字体加载）时失效 */
+    var L = null;
+    function layout() {
+      if (L) return L;
+      var base = text.getBoundingClientRect().top;
+      var tops = [], hs = [];
+      blocks.forEach(function (b) { var r = b.getBoundingClientRect(); tops.push(r.top - base); hs.push(r.height); });
+      L = { tops: tops, hs: hs, heads: heads.map(function (h) { return h.getBoundingClientRect().top - base; }), h: text.offsetHeight };
+      return L;
     }
-    function ratio() {
-      var g = geom();
-      var r = (W.pageYOffset + W.innerHeight - g.top) / g.h;
-      return Math.max(0, Math.min(1, r));
+    function textTop() { return text.getBoundingClientRect().top + W.pageYOffset; }
+    function blockAt(rel) {
+      var t = layout().tops, lo = 0, hi = t.length - 1, ans = -1;
+      while (lo <= hi) { var m = (lo + hi) >> 1; if (t[m] <= rel) { ans = m; lo = m + 1; } else hi = m - 1; }
+      return ans;
     }
-    function scrollToRatio(r) {
-      var g = geom();
-      W.scrollTo(0, Math.max(0, g.top + r * g.h - W.innerHeight));
+    function charsAt(rel) {
+      var i = blockAt(rel);
+      if (i < 0) return 0;
+      var g = layout(), f = g.hs[i] ? Math.max(0, Math.min(1, (rel - g.tops[i]) / g.hs[i])) : 1;
+      return cum[i] + f * lens[i];
     }
+    function ratio() { return Math.min(1, charsAt(W.pageYOffset + W.innerHeight - textTop()) / total); }
+    /* 视口顶部基准线所在的正文段落 + 段内偏移比例 */
+    function anchor() {
+      var rel = W.pageYOffset + TOP_LINE - textTop();
+      if (rel < 0) return null;
+      var g = layout(), i = Math.max(0, blockAt(rel + 0.5));
+      // 基准线落在段间距里时，取下一段的开头
+      if (i < blocks.length - 1 && rel > g.tops[i] + g.hs[i]) i++;
+      for (; i < blocks.length; i++) {
+        var b = blocks[i];
+        if (b.id && b.id.indexOf('p-') === 0) {
+          var o = g.hs[i] ? Math.max(0, Math.min(1, (rel - g.tops[i]) / g.hs[i])) : 0;
+          return { p: parseInt(b.id.slice(2), 10), o: Math.round(o * 1000) / 1000, r: Math.round(ratio() * 10000) / 10000 };
+        }
+      }
+      return null;
+    }
+    function scrollToAnchor(a) {
+      var el = a && a.p ? D.getElementById('p-' + a.p) : null;
+      if (!el) return false;
+      var r = el.getBoundingClientRect();
+      W.scrollTo(0, Math.max(0, r.top + W.pageYOffset + (a.o || 0) * r.height - TOP_LINE));
+      return true;
+    }
+    function scrollToRatioLegacy(r) { // 旧格式：视口底部所在位置占正文高度的比例
+      W.scrollTo(0, Math.max(0, textTop() + r * text.offsetHeight - W.innerHeight));
+    }
+    function goTo(pos) { if (!scrollToAnchor(pos)) scrollToRatioLegacy(pos.r); }
     keepPosition = function (fn) {
-      var r = ratio(), atTop = W.pageYOffset < 50;
+      var a = W.pageYOffset > 50 ? anchor() : null;
       fn();
-      if (!atTop) scrollToRatio(r);
+      L = null;
+      if (a) scrollToAnchor(a);
     };
+    if (W.ResizeObserver) new ResizeObserver(function () { L = null; schedule(); }).observe(text);
+    W.addEventListener('resize', function () { L = null; schedule(); });
 
-    var initial = ratio(), saved = parseFloat(rawGet(key));
-    var ticking = false, saveTimer = null;
-    function onScroll() {
-      if (ticking) return;
-      ticking = true;
-      W.requestAnimationFrame(function () {
-        ticking = false;
-        var r = ratio();
-        if (bar) bar.style.setProperty('--p', r.toFixed(4));
-        clearTimeout(saveTimer);
-        saveTimer = setTimeout(function () {
-          if (r > initial + 0.01 || r >= 0.995) rawSet(key, r.toFixed(4));
-        }, 400);
-      });
-    }
-    W.addEventListener('scroll', onScroll, { passive: true });
-    W.addEventListener('resize', onScroll);
-    onScroll();
-
+    /* 继续上次阅读 */
+    var saved = readPos(id), initial = ratio(), guard = null;
     var resume = $('#resume');
-    if (resume && saved > initial + 0.02 && saved < 0.98 && !location.hash && W.pageYOffset < 200) {
-      $('.pct', resume).textContent = Math.round(saved * 100) + '%';
+    if (resume && saved && saved.r > initial + 0.02 && saved.r < 0.98 && !location.hash && W.pageYOffset < 200) {
+      guard = saved.r;  // 提示未处理前，只有读到比上次更靠后才覆盖记录
+      $('.pct', resume).textContent = Math.round(saved.r * 100) + '%';
       resume.hidden = false;
-      $('.go', resume).addEventListener('click', function () { resume.hidden = true; scrollToRatio(saved); });
-      $('.x', resume).addEventListener('click', function () { resume.hidden = true; });
+      $('.go', resume).addEventListener('click', function () { resume.hidden = true; guard = null; goTo(saved); initial = ratio(); });
+      $('.x', resume).addEventListener('click', function () { resume.hidden = true; guard = null; });
     }
+    function save() {
+      var a = anchor();
+      if (!a) return;
+      if (guard !== null) { if (a.r <= guard) return; guard = null; if (resume) resume.hidden = true; }
+      if (a.r > initial + 0.002 || a.r >= 0.995) { a.t = Date.now(); rawSet(key, JSON.stringify(a)); initial = -1; }
+    }
+
+    /* 章节：顶栏中部显示当前章节名，目录面板高亮当前章节 */
+    var curHead = -2;
+    function setChapter(i) {
+      if (i === curHead) return;
+      curHead = i;
+      if (mhCh) mhCh.textContent = i >= 0 ? headNames[i] : workName;
+      Object.keys(tocLinks).forEach(function (k) { tocLinks[k].classList.remove('on'); tocLinks[k].removeAttribute('aria-current'); });
+      var a = i >= 0 ? tocLinks[heads[i].id] : null;
+      if (a) { a.classList.add('on'); a.setAttribute('aria-current', 'true'); }
+    }
+    function headAt(rel) {
+      var hs = layout().heads, ans = -1;
+      for (var i = 0; i < hs.length && hs[i] <= rel; i++) ans = i;
+      return ans;
+    }
+
+    /* 沉浸阅读：向下滚动收起顶栏，向上滚动出现；焦点在顶栏内或接近页顶时始终显示 */
+    var lastY = W.pageYOffset, mastHidden = false;
+    function setMast(hide) {
+      if (!mast || hide === mastHidden) return;
+      mastHidden = hide;
+      mast.classList.toggle('is-hidden', hide);
+    }
+    if (mast) mast.addEventListener('focusin', function () { setMast(false); });
+
+    var ticking = false, saveTimer = null, pctTxt = '';
+    function schedule() { if (!ticking) { ticking = true; W.requestAnimationFrame(update); } }
+    function update() {
+      ticking = false;
+      var y = W.pageYOffset, tt = textTop(), g = layout();
+      var r = ratio();
+      if (bar) bar.style.setProperty('--p', r.toFixed(4));
+      var rel = y + TOP_LINE - tt;
+      var reading = rel > 0 && rel < g.h + 40;
+      D.body.classList.toggle('is-reading', reading);
+      setChapter(reading ? headAt(rel + 8) : -2);
+      if (dockPct) {
+        var left = Math.ceil(total * (1 - r) / 500), t;
+        if (r >= 0.995) t = '读完了';
+        else if (left >= 60) t = '剩 ' + Math.floor(left / 60) + ' 小时' + (left % 60 ? ' ' + (left % 60) + ' 分' : '');
+        else t = '剩 ' + left + ' 分钟';
+        var s2 = Math.round(r * 100) + '%|' + t;
+        if (s2 !== pctTxt) { pctTxt = s2; $('.n', dockPct).textContent = Math.round(r * 100) + '%'; $('.t', dockPct).textContent = t; }
+        dockPct.hidden = !(rel > -W.innerHeight * 0.5);
+      }
+      var dy = y - lastY;
+      if (y < 120) { setMast(false); lastY = y; }
+      else if (Math.abs(dy) > 6) {
+        if (dy > 0 && !(mast && mast.contains(D.activeElement))) setMast(true);
+        else if (dy < 0) setMast(false);
+        lastY = y;
+      }
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(save, 400);
+    }
+    W.addEventListener('scroll', schedule, { passive: true });
+    if (D.fonts && D.fonts.ready) D.fonts.ready.then(function () { L = null; schedule(); });
+    update();
+
+    /* 键盘：← → / PageUp PageDown / 空格 翻屏（保留一行重叠），J / K 下一章、上一章 */
+    function lineH() { return parseFloat(W.getComputedStyle(text).lineHeight) || 34; }
+    function page(dir) {
+      var y = W.pageYOffset, line = lineH();
+      var covered = mast && !mastHidden && y > 0 ? mast.offsetHeight : 0;
+      if (dir > 0) W.scrollTo(0, y + W.innerHeight - line);
+      else W.scrollTo(0, Math.max(0, y + covered + line - W.innerHeight));
+    }
+    function chapter(dir) {
+      if (!heads.length) { toast('这部作品没有分章'); return; }
+      var rel = W.pageYOffset + TOP_LINE - textTop(), hs = layout().heads, i;
+      if (dir > 0) { for (i = 0; i < hs.length && hs[i] <= rel + 8; i++); }
+      else { for (i = hs.length - 1; i >= 0 && hs[i] >= rel - 4; i--); }
+      if (i < 0 || i >= hs.length) { toast(dir > 0 ? '已经是最后一章' : '已经是第一章'); return; }
+      W.scrollTo(0, Math.max(0, textTop() + hs[i] - TOP_LINE));
+    }
+    D.addEventListener('keydown', function (ev) {
+      if (ev.defaultPrevented || ev.altKey || ev.ctrlKey || ev.metaKey || ev.isComposing) return;
+      var t = ev.target, k = ev.key;
+      if (t && t.closest) {
+        if (t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="toolbar"], [role="dialog"], .tbl')) return;
+        if ((k === ' ' || k === 'Spacebar') && t.closest('button, a, summary')) return;
+      }
+      if (k === 'ArrowRight' || k === 'PageDown' || ((k === ' ' || k === 'Spacebar') && !ev.shiftKey)) { ev.preventDefault(); page(1); }
+      else if (k === 'ArrowLeft' || k === 'PageUp' || ((k === ' ' || k === 'Spacebar') && ev.shiftKey)) { ev.preventDefault(); page(-1); }
+      else if (k === 'j' || k === 'J') { ev.preventDefault(); chapter(1); }
+      else if (k === 'k' || k === 'K') { ev.preventDefault(); chapter(-1); }
+    });
 
     /* 浮动工具条面板 */
     var openPanel = null;
@@ -340,8 +534,10 @@
         if (openPanel && openPanel.panel !== panel) setPanel(openPanel.btn, openPanel.panel, false);
         setPanel(btn, panel, willOpen);
         if (willOpen) {
-          var cur = panel.querySelector('a.on') || panel.querySelector('button, a');
-          if (cur && cur.scrollIntoView && panel.scrollHeight > panel.clientHeight && panel.querySelector('a.on')) cur.scrollIntoView({ block: 'center' });
+          var cur = panel.querySelector('a.on');
+          if (cur && cur.scrollIntoView && panel.scrollHeight > panel.clientHeight) cur.scrollIntoView({ block: 'center' });
+          var first = cur || panel.querySelector('input, button, a');
+          if (first) first.focus({ preventScroll: true });
         }
       });
       panel.addEventListener('click', function (ev) {
@@ -356,31 +552,6 @@
     D.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && openPanel) { var b = openPanel.btn; setPanel(b, openPanel.panel, false); b.focus(); }
     });
-
-    var sizeBtns = $$('[data-size]');
-    sizeBtns.forEach(function (b) {
-      b.addEventListener('click', function () {
-        var p = prefs();
-        p.size = Math.max(SIZE_MIN, Math.min(SIZE_MAX, p.size + parseInt(b.getAttribute('data-size'), 10)));
-        keepPosition(function () { savePrefs(p); });
-      });
-    });
-
-    /* 目录面板高亮当前章节 */
-    var heads = $$('.ch', text), tocLinks = $$('#panel-toc a');
-    if (heads.length && tocLinks.length && W.IntersectionObserver) {
-      var map = {};
-      tocLinks.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) {
-          if (en.isIntersecting) {
-            tocLinks.forEach(function (a) { a.classList.remove('on'); });
-            var a = map[en.target.id]; if (a) a.classList.add('on');
-          }
-        });
-      }, { rootMargin: '0px 0px -70% 0px' });
-      heads.forEach(function (h) { io.observe(h); });
-    }
   }
 
   /* ---------- 讨论区 ---------- */
@@ -641,7 +812,7 @@
         w.awards.forEach(function (x) { aw.appendChild(el('span', 'mark mark-' + x.c, x.label)); });
         wb.appendChild(aw);
         wb.appendChild(el('span', 'w-ch', w.chars));
-        var r = parseFloat(rawGet('hb.read.' + w.id));
+        var pos = readPos(w.id), r = pos ? pos.r : 0;
         wb.appendChild(el('span', 'w-ai', r > 0.02 ? (r >= 0.98 ? '已读完' : '读到 ' + Math.round(r * 100) + '%') : '未开始'));
         li.appendChild(a);
         var rm = el('button', 'fav-rm', '移出收藏');
@@ -675,7 +846,8 @@
   }
 
   // 共享给 reader.js / share.js 的工具（它们在 site.js 之后加载，均为 defer）
-  W.HB = { toast: toast, api: api, copyText: copyText, device: device, jget: jget, jset: jset, el: el, prefs: prefs, savePrefs: savePrefs };
+  W.HB = { toast: toast, api: api, copyText: copyText, device: device, jget: jget, jset: jset, el: el, prefs: prefs, savePrefs: savePrefs,
+    readPos: readPos, keepPosition: function (fn) { keepPosition(fn); } };
 
   device();
   if (page === 'home') initHome();

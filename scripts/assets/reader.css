@@ -1,0 +1,146 @@
+/* 海豹杯 2026 — 阅读增强：划线、笔记、热门划线、段落高亮，以及「我的笔记」页。
+   颜色沿用套印：黄 = 马克笔，粉 / 蓝 / 墨 = 下划线。 */
+
+:root {
+  --hl-y: rgba(255, 232, 0, .78);
+  --flash: rgba(255, 72, 176, .24);
+  --hl-del: #FF7CC6;   /* 工具条底色为墨色：用浅粉 */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --hl-y: rgba(255, 232, 0, .30); --flash: rgba(255, 72, 176, .30); --hl-del: #B8006B; }
+}
+:root[data-theme="dark"] { --hl-y: rgba(255, 232, 0, .30); --flash: rgba(255, 72, 176, .30); --hl-del: #B8006B; }
+
+#text { position: relative; }
+
+/* ---------- 划线 ---------- */
+mark.hl {
+  color: inherit; background: none; padding: 0; border-radius: 0; cursor: pointer;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  text-decoration-skip-ink: none;
+}
+mark.hl-yellow { background-image: linear-gradient(transparent 28%, var(--hl-y) 28%, var(--hl-y) 92%, transparent 92%); }
+mark.hl-pink, mark.hl-blue, mark.hl-ink { text-decoration-line: underline; text-underline-offset: .32em; text-decoration-thickness: 2.5px; }
+mark.hl-pink { text-decoration-color: var(--pink); }
+mark.hl-blue { text-decoration-color: var(--blue); }
+mark.hl-ink { text-decoration-color: var(--ink); text-decoration-thickness: 1.5px; }
+mark.hl.is-active { outline: 1.5px dashed var(--line-2); outline-offset: 2px; }
+mark.hl:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+/* 段尾笔记图标（不含文字节点，不影响偏移计算与复制） */
+.rx-note {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 1.25em; height: 1.25em; margin: 0 0 0 .2em; padding: 0; vertical-align: -.12em;
+  border: 0; background: transparent; color: var(--ink); text-indent: 0; cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+.rx-note::after { content: ""; position: absolute; inset: -8px; }
+.rx-note svg { width: .9em; height: .9em; fill: var(--c, var(--yellow)); stroke: var(--ink); stroke-width: 1.3; stroke-linejoin: round; }
+.rx-note-yellow { --c: var(--yellow); }
+.rx-note-pink { --c: var(--pink); }
+.rx-note-blue { --c: var(--blue); }
+.rx-note-ink { --c: var(--ink); }
+
+/* ---------- 热门划线：段落左侧细线 + 行尾小字，克制，不可选中 ---------- */
+#text p[data-hot] { position: relative; }
+#text p[data-hot]::before {
+  content: ""; position: absolute; left: -12px; top: .45em; bottom: .45em; width: 2px;
+  background: var(--pink); opacity: .45; pointer-events: none;
+}
+#text p[data-hot="2"]::before { opacity: .7; }
+#text p[data-hot="3"]::before { width: 3px; opacity: .9; }
+@media (max-width: 719px) { #text p[data-hot]::before { left: -10px; } }
+.rx-hot {
+  display: inline-block; margin-left: .7em; text-indent: 0; vertical-align: .08em;
+  font: 12px/1 var(--f-ui); color: var(--muted); white-space: nowrap;
+  -webkit-user-select: none; user-select: none; pointer-events: none;
+}
+.rx-hot::before { content: attr(data-label); }
+
+/* ---------- 段落定位高亮（#p-N）：套印粉底淡出 ---------- */
+@keyframes rx-flash { from { background-color: var(--flash); } to { background-color: transparent; } }
+#text p.rx-flash { animation: rx-flash 2.4s ease-out 1; box-shadow: -8px 0 0 transparent; }
+
+/* ---------- 选区工具条 ---------- */
+.hl-bar {
+  position: absolute; z-index: 55; display: flex; align-items: center; gap: 1px; padding: 3px;
+  background: var(--ink); color: var(--paper); border-radius: 2px; box-shadow: 3px 3px 0 var(--pink);
+  font: 14px/1.2 var(--f-ui); text-indent: 0; text-align: left; white-space: nowrap;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.hl-bar button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; min-width: 40px; padding: 0 9px;
+  border: 0; border-radius: 2px; background: transparent; color: inherit; font-size: 14px;
+}
+.hl-bar button:hover { background: rgba(127, 128, 140, .28); }
+.hl-bar button:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
+.hl-bar .hl-sep { align-self: stretch; width: 1px; margin: 7px 3px; background: currentColor; opacity: .3; }
+.hl-bar i { display: block; width: 14px; height: 14px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1.5px currentColor; flex: none; }
+.hl-bar .hl-sw { min-width: 30px; padding: 0 7px; }
+.hl-bar .hl-sw[aria-pressed="true"] i { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px currentColor; }
+.hl-sw-yellow, .hl-main-yellow { --c: var(--yellow); }
+.hl-sw-pink, .hl-main-pink { --c: var(--pink); }
+.hl-sw-blue, .hl-main-blue { --c: var(--blue); }
+.hl-sw-ink, .hl-main-ink { --c: var(--ink); }
+.hl-bar .hl-main { font-weight: 600; }
+.hl-bar .hl-del { color: var(--hl-del); }
+@media (max-width: 380px) { .hl-bar button { padding: 0 7px; } .hl-bar .hl-sw { min-width: 28px; padding: 0 6px; } }
+
+/* ---------- 笔记编辑 / 查看气泡 ---------- */
+.hl-pop {
+  position: absolute; z-index: 56; width: min(420px, calc(100vw - 32px));
+  padding: 12px 14px 14px; background: var(--paper); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 2px; box-shadow: 4px 4px 0 var(--c, var(--yellow));
+  font: 15px/1.6 var(--f-ui); text-indent: 0; text-align: left;
+}
+.hl-pop-yellow { --c: var(--yellow); }
+.hl-pop-pink { --c: var(--pink); }
+.hl-pop-blue { --c: var(--blue); }
+.hl-pop-ink { --c: var(--line-2); }
+.hl-pop-h { margin: 0 0 6px; font-family: var(--f-display); font-weight: 700; font-size: 17px; }
+.hl-pop blockquote {
+  margin: 0 0 10px; padding-left: 10px; border-left: 3px solid var(--c, var(--yellow));
+  color: var(--muted); font-size: 14px; line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hl-pop textarea {
+  display: block; width: 100%; min-height: 6.5em; padding: 8px 10px; resize: vertical;
+  border: 1.5px solid var(--line-2); border-radius: 2px; background: var(--paper); color: var(--ink);
+  font-size: 16px; line-height: 1.6;
+}
+.hl-pop textarea:focus { border-color: var(--ink); }
+.hl-pop .note-text { margin: 0; text-indent: 0; white-space: pre-wrap; font-size: 16px; line-height: 1.75; max-height: 50vh; overflow: auto; }
+.hl-pop .acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.hl-pop .acts .btn { min-height: 40px; padding: 4px 14px; font-size: 15px; }
+.hl-pop .cnt { margin-right: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- 我的笔记 ---------- */
+.notes-bar { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 8px; }
+.nw { border-top: 2px solid var(--ink); padding-top: 14px; margin-top: 28px; }
+.nw h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin: 0 0 4px; font-family: var(--f-display); font-weight: 700; font-size: 24px; line-height: 1.3; }
+.nw h2 a { text-decoration: none; }
+.nw h2 a:hover { text-decoration: underline; text-decoration-color: var(--pink); }
+.nw-a, .nw-c { font-family: var(--f-ui); font-weight: 400; font-size: 14px; color: var(--muted); }
+.nl { list-style: none; margin: 0; padding: 0; }
+.ni { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.ni:last-child { border-bottom: 0; }
+.ni-q {
+  display: block; padding-left: 12px; border-left: 4px solid var(--c);
+  font-family: var(--f-read); font-size: 17px; line-height: 1.85; text-decoration: none; white-space: pre-line;
+}
+.ni-q:hover { text-decoration: underline; text-decoration-color: var(--c); text-decoration-thickness: 2px; }
+.ni-yellow { --c: var(--yellow); }
+.ni-pink { --c: var(--pink); }
+.ni-blue { --c: var(--blue); }
+.ni-ink { --c: var(--ink); }
+.ni-note { margin: 8px 0 0 16px; white-space: pre-wrap; font-size: 15px; line-height: 1.7; }
+.ni-note b { margin-right: .6em; font-size: 13px; color: var(--muted); font-weight: 600; }
+.ni-meta { margin: 6px 0 0 16px; font-size: 13px; color: var(--muted); }
+.notes-empty p { margin: 0 0 10px; }
+.notes-empty ol { margin: 0 0 12px; padding-left: 1.4em; max-width: 36em; }
+.notes-empty li { margin: 4px 0; }
+.notes-empty .muted { color: var(--muted); font-size: 15px; max-width: 36em; }
+
+@media (prefers-reduced-motion: reduce) {
+  #text p.rx-flash { animation: none; background-color: var(--flash); }
+}

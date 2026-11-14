@@ -6,7 +6,6 @@
 <pattern id="hero-dots-y" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="3.5" cy="3.5" r="1.8" fill="#FFE800"/></pattern>
 <filter id="hero-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
 </defs>
-<rect width="1200" height="800" fill="#EEEFEA"/>
 <g style="mix-blend-mode:multiply">
 <path d="M520 566H1164V764H640Z" fill="url(#hero-dots-b)" opacity="0.55"/>
 <g fill="none" stroke="#0078BF" stroke-width="1.5" opacity="0.6">
@@ -45,5 +44,4 @@
 <circle cx="704" cy="398" r="4"/>
 <circle cx="360" cy="120" r="2"/><circle cx="210" cy="260" r="2"/><circle cx="460" cy="330" r="2"/><circle cx="120" cy="90" r="2"/>
 </g>
-<rect width="1200" height="800" filter="url(#hero-grain)" opacity="0.12"/>
 </svg>

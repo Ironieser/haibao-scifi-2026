@@ -1,5 +1,5 @@
 // 海豹杯 2026 获奖作品站 — Pages Functions 后端（/api/*）
-// 接口与表结构以 SPEC.md 为准。
+// 接口与表结构以 SPEC.md 为准；热门划线接口（/api/works/:id/marks）见下方 handleListMarks / handlePostMarks。
 
 const WORK_IDS = new Set([
   'huidao-mingtian', 'zhuan-rengong', 'yiqie-ruchang', 'shuzi-shibolie',
@@ -17,6 +17,12 @@ const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 50;
 const REPLIES_PER_COMMENT = 50;
 const DEFAULT_NAME = '匿名读者';
+const MARKS_TTL = 60;
+const MARKS_TOP = 50;          // 热门段落最多返回 50 段
+const MARKS_MIN = 2;           // n >= 2 才算热门（与 schema.sql 中部分索引的条件一致，须为字面量）
+const MARK_P_MAX = 5000;       // 段落编号上限（最长的作品约 1200 段）
+const MARK_BATCH_MAX = 30;     // 一次请求最多 30 段（跨段划线）
+const MARK_DAY_MAX = 300;      // 同一设备每天最多 300 次（按段计）
 
 // 限流规则：[key 前缀, 窗口毫秒, 上限, 超限提示]
 const BURST_MS = 15 * 1000;
@@ -139,6 +145,10 @@ function statsCacheKey(url) {
 
 function commentsCacheKey(url, work, before, limit) {
   return new Request(`${url.origin}/api/works/${work}/comments?before=${before}&limit=${limit}`, { method: 'GET' });
+}
+
+function marksCacheKey(url, work) {
+  return new Request(`${url.origin}/api/works/${work}/marks`, { method: 'GET' });
 }
 
 function getCache() {
@@ -427,6 +437,92 @@ async function handleDeleteComment(env, ctx, request, url, cid) {
   return json({ ok: true });
 }
 
+
+// ---------- 热门划线 ----------
+// GET：主键前缀 work + 部分索引 mark_counts_top（n >= 2），只读取前 50 行；边缘缓存 60 秒。
+async function handleListMarks(env, ctx, url, work) {
+  return cached(ctx, marksCacheKey(url, work), MARKS_TTL, async () => {
+    const { results } = await env.DB.prepare(
+      `SELECT p, n FROM mark_counts WHERE work = ?1 AND n >= 2 ORDER BY n DESC LIMIT ${MARKS_TOP}`
+    ).bind(work).all();
+    return { top: (results || []).map((r) => ({ p: r.p, n: r.n })) };
+  });
+}
+
+function parseMarkParagraphs(v) {
+  const list = Array.isArray(v) ? v : [v];
+  if (!list.length || list.length > MARK_BATCH_MAX) throw new HttpError(400, `参数 p 必须是 1–${MARK_BATCH_MAX} 个段落编号`);
+  const out = [];
+  for (const x of list) {
+    if (!Number.isSafeInteger(x) || x < 1 || x > MARK_P_MAX) throw new HttpError(400, '参数 p 必须是有效的段落编号');
+    if (!out.includes(x)) out.push(x);
+  }
+  return out;
+}
+
+// POST {device, p, on}：p 为段落编号（或最多 30 个编号的数组，用于跨段划线）。
+// 与点赞相同的增量写法，全部为主键点查，O(段数)。限流与写入放在同一个 batch（同一事务）里：
+//   1. 限流计数 +段数（窗口 24 小时）；
+//   2. 每段：计数 ±1（条件：未超限，且 marks 中这一行当前不存在/存在），再插入/删除 marks；
+//   3. 删除归零的计数行，读回计数与限流值。
+// 超限时 2 中的语句因条件不满足而不生效，整个请求返回 429。
+async function handlePostMarks(env, request, work) {
+  const body = await readJson(request);
+  const actor = await actorFrom(env, body);
+  const on = requireBool(body.on);
+  const ps = parseMarkParagraphs(body.p);
+  const now = Date.now();
+  const rlKey = `markday:${actor}`;
+  const RL_OK = `(SELECT n FROM ratelimit WHERE key = ?4) <= ${MARK_DAY_MAX}`;
+  const stmts = [
+    env.DB.prepare(
+      `INSERT INTO ratelimit (key, n, reset) VALUES (?1, ?2, ?3)
+       ON CONFLICT (key) DO UPDATE SET
+         n = CASE WHEN reset <= ?4 THEN ?2 ELSE n + ?2 END,
+         reset = CASE WHEN reset <= ?4 THEN ?3 ELSE reset END`
+    ).bind(rlKey, ps.length, now + DAY_MS, now),
+  ];
+  for (const p of ps) {
+    if (on) {
+      stmts.push(
+        env.DB.prepare(
+          `INSERT INTO mark_counts (work, p, n)
+           SELECT ?1, ?2, 1
+           WHERE ${RL_OK} AND NOT EXISTS (SELECT 1 FROM marks WHERE work = ?1 AND p = ?2 AND actor = ?3)
+           ON CONFLICT (work, p) DO UPDATE SET n = n + 1`
+        ).bind(work, p, actor, rlKey),
+        env.DB.prepare(
+          `INSERT OR IGNORE INTO marks (work, p, actor) SELECT ?1, ?2, ?3 WHERE ${RL_OK}`
+        ).bind(work, p, actor, rlKey),
+      );
+    } else {
+      stmts.push(
+        env.DB.prepare(
+          `UPDATE mark_counts SET n = MAX(n - 1, 0)
+           WHERE work = ?1 AND p = ?2 AND ${RL_OK}
+             AND EXISTS (SELECT 1 FROM marks WHERE work = ?1 AND p = ?2 AND actor = ?3)`
+        ).bind(work, p, actor, rlKey),
+        env.DB.prepare(
+          `DELETE FROM marks WHERE work = ?1 AND p = ?2 AND actor = ?3 AND ${RL_OK}`
+        ).bind(work, p, actor, rlKey),
+        env.DB.prepare('DELETE FROM mark_counts WHERE work = ?1 AND p = ?2 AND n <= 0').bind(work, p),
+      );
+    }
+  }
+  stmts.push(env.DB.prepare('SELECT n FROM ratelimit WHERE key = ?1').bind(rlKey));
+  stmts.push(env.DB.prepare(
+    'SELECT p, n FROM mark_counts WHERE work = ?1 AND p IN (SELECT value FROM json_each(?2))'
+  ).bind(work, JSON.stringify(ps)));
+  const res = await env.DB.batch(stmts);
+  const used = res[res.length - 2].results?.[0]?.n ?? 0;
+  if (used > MARK_DAY_MAX) {
+    throw new HttpError(429, `今天的划线操作已达上限（${MARK_DAY_MAX} 次），本机划线照常保存，热门划线计数明天恢复同步`);
+  }
+  const counts = new Map((res[res.length - 1].results || []).map((r) => [r.p, r.n]));
+  const items = ps.map((p) => ({ p, n: counts.get(p) ?? 0 }));
+  return json(Array.isArray(body.p) ? { on, items } : { on, p: items[0].p, n: items[0].n, items });
+}
+
 // ---------- 路由 ----------
 
 function methodNotAllowed(allow) {
@@ -452,14 +548,19 @@ async function route(context) {
     return handleStats(env, ctx, url);
   }
 
-  // /api/works/:id/(like|fav|comments)
+  // /api/works/:id/(like|fav|comments|marks)
   if (parts[0] === 'works' && parts.length === 3) {
     const [, work, action] = parts;
-    if (!['like', 'fav', 'comments'].includes(action)) throw new HttpError(404, '接口不存在');
+    if (!['like', 'fav', 'comments', 'marks'].includes(action)) throw new HttpError(404, '接口不存在');
     if (!WORK_IDS.has(work)) throw new HttpError(404, '作品不存在');
     if (action === 'like' || action === 'fav') {
       if (method !== 'POST') return methodNotAllowed('POST');
       return handleReaction(env, request, work, action);
+    }
+    if (action === 'marks') {
+      if (method === 'GET') return handleListMarks(env, ctx, url, work);
+      if (method === 'POST') return handlePostMarks(env, request, work);
+      return methodNotAllowed('GET, POST');
     }
     if (method === 'GET') return handleListComments(env, ctx, url, work);
     if (method === 'POST') return handlePostComment(env, ctx, request, url, work);
