@@ -18,6 +18,7 @@ from xml.sax.saxutils import escape as _xml_escape
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data" / "works.json"
 CONTENT = ROOT / "content" / "works"
+ART_NOTES = ROOT / "art" / "notes"
 OUT = ROOT / "dist" / "downloads"
 SITE = "https://scifi.ironieser.cc"
 SOURCE_LINE = "2026年海豹杯科幻文学大赛获奖作品 · 版权归作者所有"
@@ -98,21 +99,45 @@ def zip_name(w, ext):
 
 # ---------------------------------------------------------------- TXT
 
+TXT_BLOCK = ("doc", "box", "code", "sys")  # 这些段落样式在 TXT 中前后空行、整体缩进、逐行原样输出
+
+
 def blocks_txt(blocks):
     out = []
+    prev_cls = None
     for b in blocks:
         t = b["t"]
+        cls = b.get("cls")
+        group = cls if cls in TXT_BLOCK else None
+        if group != prev_cls:
+            out.append("")
+        prev_cls = group
+        x = clean(b.get("x", ""))
+        pad = INDENT if group else ""
         if t == "p":
-            out.append(INDENT + plain(b["x"]).strip())
+            if group == "code":
+                out.append(pad + x.rstrip())
+            elif group or cls == "right":
+                out.append(pad + x.strip())
+            else:
+                out.append(INDENT + x.strip())
+        elif t == "li":
+            lead = INDENT * (1 + (b.get("lvl") or 0))
+            out.append(pad + lead + (b.get("mk") or "•") + " " + x.strip())
         elif t == "h":
-            out += ["", plain(b["x"]).strip(), ""]
+            if group:
+                out.append(pad + x.strip())
+            else:
+                out += ["", x.strip(), ""]
         elif t == "c":
-            out.append(plain(b["x"]).strip())
+            out.append(pad + x.strip())
         elif t == "hr":
             out += ["", "* * *", ""]
+        elif t == "img":
+            out.append(INDENT + "〔原文截图〕")
         elif t == "table":
             out.append("")
-            out += ["\t".join(plain(c) for c in row) for row in b["rows"]]
+            out += [pad + "\t".join(clean(c) for c in row) for row in b["rows"]]
             out.append("")
     # 合并多余空行
     res = []
@@ -172,6 +197,29 @@ th, td { border: 1px solid #888; padding: 0.3em 0.5em; text-align: left; vertica
 .source { font-size: 0.85em; margin-top: 2em; }
 nav ol { list-style: none; padding-left: 0; }
 nav li { margin: 0.3em 0; }
+em { font-style: normal; font-family: "Kaiti SC", STKaiti, KaiTi, serif; }
+u { text-decoration: underline; text-underline-offset: 0.25em; }
+code.ic { font-family: inherit; border: 1px solid #bbb; padding: 0 0.2em; }
+.blk { margin: 1em 0; }
+.blk p { text-indent: 0; }
+.bh { font-weight: bold; text-indent: 0; margin-top: 0.6em; }
+.blk-doc { font-family: FangSong, STFangsong, serif; border-left: 2px solid #999; padding-left: 1em; margin-left: 0.5em; }
+.blk-letter { font-family: "Kaiti SC", STKaiti, KaiTi, serif; color: #2A4170; padding-left: 1.5em; }
+.blk-letter p { text-indent: 2em; }
+.blk-alt { font-family: "Kaiti SC", STKaiti, KaiTi, serif; }
+.blk-alt p { text-indent: 2em; }
+.blk-epi { font-size: 0.9em; color: #555; margin-left: 30%; margin-bottom: 2em; }
+.blk-sys { font-family: sans-serif; font-size: 0.88em; border: 1px solid #bbb; background: #f2f2f2; padding: 0.4em 0.8em; }
+.blk-q { border-left: 3px solid #aaa; padding-left: 1em; color: #555; }
+.blk-code { font-family: monospace; font-size: 0.82em; white-space: pre-wrap; line-height: 1.5; }
+.blk-box { font-family: FangSong, STFangsong, serif; border: 1px solid #888; padding: 0.8em 1em; }
+.blk-right p { text-align: right; }
+ul, ol { margin: 0.4em 0 0.8em; padding-left: 2em; }
+li { margin: 0.1em 0; }
+li.li-sub { list-style: none; }
+ul.lst-1 { list-style: circle; }
+figure.fig { margin: 1em 0; text-align: center; }
+figure.fig img { max-width: 100%; }
 """
 
 
@@ -190,31 +238,101 @@ def xhtml_doc(title, body, extra_ns=""):
     )
 
 
-def blocks_xhtml(blocks, hlevel=2, hid=None):
+XTAGS = (("b", "strong"), ("i", "em"), ("u", "u"), ("code", "code"))
+ORDERED_MK = re.compile(r"^(\d+)[.)]$")
+
+
+def rich_xhtml(x, m=None):
+    """纯文本 + 格式区间 -> XHTML（与网页同样按边界切片、固定嵌套顺序）。"""
+    x = clean(x)
+    if not m:
+        return attr(x)
+    cuts = sorted({0, len(x)} | {c for s, e, _ in m for c in (s, e) if 0 <= c <= len(x)})
     out = []
+    for a, b in zip(cuts, cuts[1:]):
+        kinds = {k for s, e, k in m if s <= a and e >= b}
+        seg = attr(x[a:b])
+        for k, tag in reversed(XTAGS):
+            if k in kinds:
+                cls = ' class="ic"' if k == "code" else ""
+                seg = f"<{tag}{cls}>{seg}</{tag}>"
+        out.append(seg)
+    return "".join(out)
+
+
+def blocks_xhtml(blocks, hlevel=2, hid=None, images=None):
+    """images: src -> EPUB 内路径（make_epub 负责打包）。"""
+    out = []
+    cur_cls = None
+    lists = []
+
+    def close_lists(to=0):
+        while len(lists) > to:
+            tag, lvl = lists.pop()
+            out.append(f"</{tag}>" + ("</li>" if lvl == 1 else ""))
+
     for b in blocks:
         t = b["t"]
+        cls = b.get("cls")
+        if t != "li":
+            close_lists()
+        if cls != cur_cls:
+            close_lists()
+            if cur_cls:
+                out.append("</div>")
+            if cls:
+                out.append(f'<div class="blk blk-{attr(cls)}">')
+            cur_cls = cls
         if t == "p":
-            out.append(f"<p>{inline_xhtml(b['x'])}</p>")
+            out.append(f"<p>{rich_xhtml(b['x'], b.get('m'))}</p>")
+        elif t == "li":
+            lvl = 1 if b.get("lvl") == 1 else 0
+            om = ORDERED_MK.match(b.get("mk") or "")
+            tag = "ol" if om else "ul"
+            if lvl == 1 and not lists:
+                lists.append(("ul", 0))
+                out.append('<ul class="lst">')
+            if lists and lists[-1][1] > lvl:
+                close_lists(1)
+            if lists and lists[-1][1] == lvl and lists[-1][0] != tag:
+                close_lists(len(lists) - 1)
+            if not lists or lists[-1][1] < lvl:
+                start = f' start="{om.group(1)}"' if om and om.group(1) != "1" else ""
+                sub = '<li class="li-sub">' if lvl == 1 else ""
+                out.append(f'{sub}<{tag} class="lst lst-{lvl}"{start}>')
+                lists.append((tag, lvl))
+            out.append(f"<li>{rich_xhtml(b['x'], b.get('m'))}</li>")
         elif t == "h":
-            ida = f' id="{hid}"' if hid else ""
-            hid = None
-            out.append(f"<h{hlevel}{ida}>{inline_xhtml(b['x'])}</h{hlevel}>")
+            if cls:
+                out.append(f'<p class="bh">{rich_xhtml(b["x"], b.get("m"))}</p>')
+            else:
+                ida = f' id="{hid}"' if hid else ""
+                hid = None
+                out.append(f"<h{hlevel}{ida}>{rich_xhtml(b['x'], b.get('m'))}</h{hlevel}>")
         elif t == "c":
-            out.append(f'<p class="center">{inline_xhtml(b["x"])}</p>')
+            out.append(f'<p class="center">{rich_xhtml(b["x"], b.get("m"))}</p>')
         elif t == "hr":
             out.append("<hr/>")
+        elif t == "img":
+            href = (images or {}).get(b["src"])
+            if href:
+                out.append(f'<figure class="fig"><img src="{attr(href)}" alt="原文截图"/></figure>')
+            else:
+                out.append('<p class="center">〔原文截图〕</p>')
         elif t == "table":
             rows = b["rows"]
             parts = ["<table>"]
             if len(rows) > 1:
-                parts.append("<thead><tr>" + "".join(f"<th>{inline_xhtml(c)}</th>" for c in rows[0]) + "</tr></thead>")
+                parts.append("<thead><tr>" + "".join(f"<th>{attr(clean(c))}</th>" for c in rows[0]) + "</tr></thead>")
                 rows = rows[1:]
             parts.append("<tbody>")
             for r in rows:
-                parts.append("<tr>" + "".join(f"<td>{inline_xhtml(c)}</td>" for c in r) + "</tr>")
+                parts.append("<tr>" + "".join(f"<td>{attr(clean(c))}</td>" for c in r) + "</tr>")
             parts.append("</tbody></table>")
             out.append("\n".join(parts))
+    close_lists()
+    if cur_cls:
+        out.append("</div>")
     return "\n".join(out)
 
 
@@ -223,7 +341,7 @@ def split_chapters(w):
     chapters = []
     cur_title, cur = None, []
     for b in w["body"]:
-        if b["t"] == "h":
+        if b["t"] == "h" and not b.get("cls"):  # 区块内的小标题不拆章（与网站目录一致）
             if cur or cur_title is not None:
                 chapters.append((cur_title, cur))
             cur_title, cur = plain(b["x"]).strip(), [b]
@@ -273,6 +391,15 @@ def make_epub(meta, w):
             order.append(mid)
 
     add("style.css", CSS, "text/css", "css", spine=False)
+    # 附录截图：art/notes/<id>/<n>.jpg -> OEBPS/images/<n>.jpg
+    images = {}
+    for b in w["body"] + [x for n in w["notes"] for x in n["body"]]:
+        if b["t"] == "img" and b["src"] not in images:
+            f = ART_NOTES / b["src"]
+            if f.exists():
+                href = "images/" + b["src"].split("/")[-1]
+                images[b["src"]] = href
+                add(href, f.read_bytes(), "image/jpeg", "img" + str(len(images)), spine=False)
     add("title.xhtml", titlepage_xhtml(meta, w), "application/xhtml+xml", "titlepage")
 
     nav_items = [("title.xhtml", "标题页")]
@@ -280,11 +407,11 @@ def make_epub(meta, w):
     hno = 0  # 章节锚点与网站一致：ch-<toc 序号>，从 1 起
     for i, (title, blocks) in enumerate(chapters, 1):
         path = f"chapter-{i:03d}.xhtml"
-        if blocks and blocks[0]["t"] == "h":
+        if blocks and blocks[0]["t"] == "h" and not blocks[0].get("cls"):
             hno += 1
-            body = blocks_xhtml(blocks, hid=f"ch-{hno}")
+            body = blocks_xhtml(blocks, hid=f"ch-{hno}", images=images)
         else:
-            body = blocks_xhtml(blocks)
+            body = blocks_xhtml(blocks, images=images)
         sec = f'<section epub:type="chapter">\n{body}\n</section>'
         add(path, xhtml_doc(f"{w['title']} · {title}" if len(chapters) > 1 else w["title"], sec),
             "application/xhtml+xml", f"ch{i:03d}")
@@ -292,7 +419,7 @@ def make_epub(meta, w):
     for i, n in enumerate(w["notes"], 1):
         path = f"appendix-{i}.xhtml"
         ntitle = plain(n["title"]).strip()
-        body = f"<h2>附录：{attr(ntitle)}</h2>\n" + blocks_xhtml(n["body"], hlevel=3)
+        body = f"<h2>附录：{attr(ntitle)}</h2>\n" + blocks_xhtml(n["body"], hlevel=3, images=images)
         sec = f'<section epub:type="appendix">\n{body}\n</section>'
         add(path, xhtml_doc(f"附录：{ntitle}", sec), "application/xhtml+xml", f"app{i}")
         nav_items.append((path, f"附录：{ntitle}"))
@@ -362,7 +489,7 @@ def make_epub(meta, w):
         for name, text in entries:
             zi = zipfile.ZipInfo(name, ZIP_TIME)
             zi.compress_type = zipfile.ZIP_DEFLATED
-            z.writestr(zi, text.encode("utf-8"))
+            z.writestr(zi, text if isinstance(text, bytes) else text.encode("utf-8"))
     return buf.getvalue()
 
 

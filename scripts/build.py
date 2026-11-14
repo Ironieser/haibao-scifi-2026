@@ -194,39 +194,139 @@ def cover_html(w, cls, width, height, alt=True, eager=False):
 
 
 # ---------------------------------------------------------------- body rendering
+TAGS = (("b", "<strong>", "</strong>"), ("i", "<em>", "</em>"), ("u", "<u>", "</u>"),
+        ("code", '<code class="ic">', "</code>"))
+TAG_RE = re.compile(r"<[^>]+>")
+ORDERED_MK = re.compile(r"^(\d+)[.)]$")
+
+
+def rich_html(x, m=None):
+    """纯文本 x + 格式区间 m -> HTML。按区间边界切片，每片包上覆盖它的全部标签（固定嵌套顺序），
+    所以重叠区间也能正确嵌套；渲染结果的 textContent 严格等于 x（划线偏移依赖这一点）。"""
+    if not m:
+        out = esc(x)
+    else:
+        cuts = sorted({0, len(x)} | {c for s, e, _ in m for c in (s, e) if 0 <= c <= len(x)})
+        out = []
+        for a, b in zip(cuts, cuts[1:]):
+            kinds = {k for s, e, k in m if s <= a and e >= b}
+            seg = esc(x[a:b])
+            for k, op, cl in reversed(TAGS):
+                if k in kinds:
+                    seg = op + seg + cl
+            out.append(seg)
+        out = "".join(out)
+    assert html.unescape(TAG_RE.sub("", out)) == x, x[:40]
+    return out
+
+
+def figure_html(b):
+    src = ART / "notes" / b["src"]
+    v = f"?v={sha8(src.read_bytes())}" if src.exists() else ""
+    return (f'<figure class="fig"><img src="/assets/notes/{esc(b["src"])}{v}" width="{int(b.get("w") or 0)}" '
+            f'height="{int(b.get("h") or 0)}" loading="lazy" decoding="async" alt="原文截图"></figure>')
+
+
 def render_blocks(blocks, chapter_ids=True, note_prefix=None):
+    """正文块 -> HTML。
+    · 连续同 cls 的块包进 <div class="blk blk-<cls>">；连续 li 包进 <ul>/<ol>，lvl 1 嵌在 <li class="li-sub"> 里；
+    · 正文（chapter_ids=True）里每个可划线的文本块（p、li，含带 cls 的）按顺序编 id="p-N"，c 与 h 不编号；
+    · 带 cls 的标题（区块内的小标题）不编 ch-N，与 clean.py 的目录一致。"""
     out, ch, pi = [], 0, 0
+    cur_cls = None
+    lists = []  # 打开的列表栈：[(tag, lvl)]
+
+    def close_lists(to=0):
+        while len(lists) > to:
+            tag, lvl = lists.pop()
+            out.append(f"</{tag}>" + ("</li>" if lvl == 1 else ""))
+
+    def pid():
+        nonlocal pi
+        if not chapter_ids:
+            return ""
+        pi += 1
+        return f' id="p-{pi}"'
+
     for b in blocks:
         t = b.get("t")
+        cls = b.get("cls")
+        if t != "li":
+            close_lists()
+        if cls != cur_cls:
+            close_lists()
+            if cur_cls:
+                out.append("</div>")
+            if cls:
+                out.append(f'<div class="blk blk-{esc(cls)}">')
+            cur_cls = cls
         if t == "p":
-            if chapter_ids:  # 正文段落带稳定编号，供划线/笔记/段落分享定位
-                pi += 1
-                out.append(f'<p id="p-{pi}">{inline(b["x"])}</p>')
-            else:
-                out.append(f"<p>{inline(b['x'])}</p>")
+            out.append(f'<p{pid()}>{rich_html(b["x"], b.get("m"))}</p>')
+        elif t == "li":
+            lvl = 1 if b.get("lvl") == 1 else 0
+            om = ORDERED_MK.match(b.get("mk") or "")
+            tag = "ol" if om else "ul"
+            if lvl == 1 and not lists:
+                lists.append(("ul", 0))
+                out.append('<ul class="lst">')
+            if lists and lists[-1][1] > lvl:
+                close_lists(1)
+            if lists and lists[-1][1] == lvl and lists[-1][0] != tag:
+                close_lists(len(lists) - 1)
+            if not lists or lists[-1][1] < lvl:
+                start = f' start="{om.group(1)}"' if om and om.group(1) != "1" else ""
+                sub = '<li class="li-sub">' if lvl == 1 else ""
+                out.append(f'{sub}<{tag} class="lst lst-{lvl}"{start}>')
+                lists.append((tag, lvl))
+            out.append(f'<li{pid()}>{rich_html(b["x"], b.get("m"))}</li>')
         elif t == "h":
-            if chapter_ids:
+            if cls:
+                out.append(f'<h3 class="bh">{rich_html(b["x"], b.get("m"))}</h3>')
+            elif chapter_ids:
                 ch += 1
-                out.append(f'<h2 class="ch" id="ch-{ch}">{inline(b["x"])}'
+                out.append(f'<h2 class="ch" id="ch-{ch}">{rich_html(b["x"], b.get("m"))}'
                            f'<a class="anc" href="#ch-{ch}" aria-label="本章链接">#</a></h2>')
             else:
-                out.append(f'<h3 class="nh">{inline(b["x"])}</h3>')
+                out.append(f'<h3 class="nh">{rich_html(b["x"], b.get("m"))}</h3>')
         elif t == "c":
-            out.append(f'<p class="cc">{inline(b["x"])}</p>')
+            out.append(f'<p class="cc">{rich_html(b["x"], b.get("m"))}</p>')
         elif t == "hr":
             out.append('<p class="sep" role="separator" aria-label="分隔">＊＊＊</p>')
+        elif t == "img":
+            out.append(figure_html(b))
         elif t == "table":
             rows = b.get("rows") or []
             if not rows:
                 continue
             head, *rest = rows
-            th = "".join(f'<th scope="col">{inline(c)}</th>' for c in head)
+            th = "".join(f'<th scope="col">{esc(c)}</th>' for c in head)
             trs = "".join("<tr>" + "".join(
-                (f'<td class="nw">{inline(c)}</td>' if len(c) <= 12 else f"<td>{inline(c)}</td>") for c in r)
+                (f'<td class="nw">{esc(c)}</td>' if len(c) <= 12 else f"<td>{esc(c)}</td>") for c in r)
                 + "</tr>" for r in rest)
             out.append(f'<div class="tbl" role="region" aria-label="表格" tabindex="0"><table>'
                        f"<thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table></div>")
+    close_lists()
+    if cur_cls:
+        out.append("</div>")
     return "\n".join(out)
+
+
+def copy_note_images():
+    """附录截图 art/notes/<id>/<n>.jpg -> dist/assets/notes/（与 convert.py 的输出同步，多余的旧图删掉）。"""
+    src_root, dst_root = ART / "notes", DIST / "assets" / "notes"
+    keep = set()
+    if src_root.exists():
+        for f in sorted(src_root.rglob("*.jpg")):
+            rel = f.relative_to(src_root)
+            keep.add(rel)
+            dst = dst_root / rel
+            data = f.read_bytes()
+            if not dst.exists() or dst.read_bytes() != data:
+                write(dst, data)
+    if dst_root.exists():
+        for f in dst_root.rglob("*.jpg"):
+            if f.relative_to(dst_root) not in keep:
+                f.unlink()
 
 
 TOC_MAJOR = re.compile(r"^[一二三四五六七八九十百]+、")
@@ -322,7 +422,7 @@ def og_image_tags(path):
             f'<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:image" content="{src}">')
 
 
-EXTRA_ASSETS = ("reader.css", "reader.js", "share.css", "share.js", "vendor/qrcode.js")
+EXTRA_ASSETS = ("prose.css", "reader.css", "reader.js", "share.css", "share.js", "vendor/qrcode.js")
 
 
 def extra_asset_tags(names=EXTRA_ASSETS):
@@ -1043,6 +1143,7 @@ def main():
     hero_art = build_art(works)
     build_home(ctx, meta, works, by_id, hero_art)
     build_stats(ctx, meta, works)
+    copy_note_images()
     for w in works:
         build_work(ctx, meta, works, by_id, w)
     build_favorites(ctx, meta, works)

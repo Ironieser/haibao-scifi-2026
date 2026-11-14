@@ -48,7 +48,7 @@
     try { meta = JSON.parse(metaEl.textContent); } catch (e) { return; }
     var wid = meta.id;
     var marks = loadMarks(wid);
-    var paras = Array.prototype.slice.call(text.querySelectorAll('p[id^="p-"]'));
+    var paras = Array.prototype.slice.call(text.querySelectorAll('p[id^="p-"], li[id^="p-"]'));
     var coarse = W.matchMedia && W.matchMedia('(pointer: coarse)').matches;
 
     function para(n) { return D.getElementById('p-' + n); }
@@ -289,6 +289,7 @@
     }
     function mountAfter(box, p) {
       // 放在相关段落之后：Tab 键从选区处可以直接进入工具条
+      while (p && p.parentNode && p.parentNode !== text) p = p.parentNode;  // 段落可能在区块/列表容器里
       if (p && p.parentNode === text) text.insertBefore(box, p.nextSibling);
       else text.appendChild(box);
     }
@@ -570,7 +571,7 @@
     }
     function paintHot() {
       Array.prototype.slice.call(text.querySelectorAll('.rx-hot')).forEach(function (x) { x.parentNode.removeChild(x); });
-      Array.prototype.slice.call(text.querySelectorAll('p[data-hot]')).forEach(function (x) { x.removeAttribute('data-hot'); });
+      Array.prototype.slice.call(text.querySelectorAll('[data-hot]')).forEach(function (x) { x.removeAttribute('data-hot'); });
       if (!hotOn || !hot) return;
       hot.forEach(function (h) {
         var p = para(h.p);

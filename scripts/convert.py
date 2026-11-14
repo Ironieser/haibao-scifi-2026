@@ -1,6 +1,6 @@
 """把原始稿件（docx / pdf / txt）转成统一的段落块 JSON。
 
-用法：python3 -I scripts/convert.py <稿件根目录> <输出目录>
+用法：python3 -I scripts/convert.py <稿件根目录> <输出目录> [作品 id ...]
 输出：<输出目录>/<id>.json  ->  {"body": [...blocks], "notes": [{"title":..., "body": [...]}]}
 附录 PDF 中的截图另存到 art/notes/<id>/<n>.jpg。
 
@@ -28,7 +28,6 @@ from xml.etree import ElementTree as ET
 ROOT = Path(__file__).resolve().parent.parent
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
-V = "{urn:schemas-microsoft-com:vml}"
 O = "{urn:schemas-microsoft-com:office:office}"
 MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
 
@@ -567,7 +566,9 @@ def run_fmt(props):
 
 
 def is_cjk(c):
-    return "一" <= c <= "\u9fff" or "㐀" <= c <= "䶿"
+    """汉字（含扩展 A、康熙部首/部首补充、兼容汉字：PDF 文本常用这些码位）。"""
+    return ("\u4e00" <= c <= "\u9fff" or "\u3400" <= c <= "\u4dbf" or "\u2e80" <= c <= "\u2fdf"
+            or "\uf900" <= c <= "\ufaff")
 
 
 class DocxPara:
@@ -1018,10 +1019,6 @@ def pdf_shapes(path: Path, npages: int, tmp: Path):
     return shapes
 
 
-def is_han(c):
-    return is_cjk(c)
-
-
 def is_cjkp(c):
     return is_cjk(c) or "\u3000" <= c <= "\u303f" or "\uff00" <= c <= "\uffef" or c in "“”‘’…—"
 
@@ -1109,6 +1106,8 @@ class Line:
                     continue
                 if is_cjkp(a[0][-1:] or " ") and b[0][:1] in "、，。；：！？）》」』":
                     continue
+                if a[0][-1:] in "，。、；：！？" and is_cjk(b[0][:1] or " "):
+                    continue  # 全角标点后的空格
             out.append((c, f))
         segs = out
         self.segs = segs
@@ -1274,7 +1273,6 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
                     b.update(t="li", lvl=0, mk="•")
                 if cur["cls"]:
                     b["cls"] = cur["cls"]
-                b["_ended"] = cur.get("ended")
                 blocks.append(b)
         cur = None
 
@@ -1307,7 +1305,7 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
         elif gap is not None and gap > 2.6 * lh and not big and not (cur is None and blocks and blocks[-1]["t"] == "h"):
             flush()
             if blocks and blocks[-1]["t"] not in ("hr", "h", "img"):
-                blocks.append({"t": "hr", "_gap": True})
+                blocks.append({"t": "hr"})
             prev_ended = True
         if big:
             flush()
@@ -1333,10 +1331,10 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
             prev_ended = True
             continue
         indented = prev is not None and abs(l.x0 - prev.x0) > char_w * 0.8
+        # 段距：同页相邻行基线距超过段内行距 1.18 倍即分段（静音区段距只有行距的 1.28 倍）
         newpara = (cur is None or prev_ended or indented or l.li or (cur and cur["cls"] != l.cls)
                    or (gap is not None and gap > 1.18 * lh))
         if cur is not None and newpara:
-            cur["ended"] = True
             flush()
         if cur is None:
             nt = norm(text)
@@ -1348,11 +1346,16 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
                 continue
             cur = {"segs": [], "cls": l.cls, "li": l.li}
         else:
-            # 行间拼接：英文单词间补空格
-            pt = "".join(t for t, _ in cur["segs"]).rstrip()
+            # 行间拼接：去掉行尾/行首空白，英文单词间补一个空格
+            while cur["segs"] and not cur["segs"][-1][0].strip():
+                cur["segs"].pop()
+            pt = "".join(t for t, _ in cur["segs"])
             if re.search(r"[A-Za-z0-9,.]$", pt) and re.match(r"[A-Za-z0-9]", text.lstrip()):
                 cur["segs"].append((" ", set()))
-        cur["segs"].extend(l.segs)
+        segs = list(l.segs)
+        while segs and not segs[0][0].strip():
+            segs.pop(0)
+        cur["segs"].extend(segs)
         short = l.x1 < right - char_w * 1.2
         prev_ended = short and (bool(re.search(r"[。！？!?…”」』）)\]：:—~～.*\"'】》]$", text.rstrip()))
                                 or l.x1 - l.x0 < (right - left) * 0.5)
@@ -1360,8 +1363,6 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
     flush()
     for b in blocks:
         b.pop("_pg", None)
-        b.pop("_ended", None)
-        b.pop("_gap", None)
     blocks = [md_line(b) if b["t"] == "p" else b for b in blocks]
     # 紧挨标题的分隔线（Markdown 导出的 PDF 常在每节标题前画一条 ---）由标题本身承担
     out = []

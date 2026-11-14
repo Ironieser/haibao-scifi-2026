@@ -1,0 +1,129 @@
+/* 正文语义版式：convert.py 输出的行内格式（m）、段落样式（cls）、列表（li）与附录截图（img）。
+   只用 site.css 的颜色变量，深色模式、护眼绿/羊皮背景自动适配。中文排版优先，克制。 */
+:root {
+  --f-fs: "FangSong", "STFangsong", "Fangsong SC", "FangSong_GB2312", var(--f-kai);
+  --f-mono: ui-monospace, "SF Mono", Menlo, Consolas, "PingFang SC", "Microsoft YaHei", monospace;
+  --letter: #2A4170; /* 墨蓝 */
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --letter: #A9BEEB; } }
+:root[data-theme="dark"] { --letter: #A9BEEB; }
+
+/* ---------- 行内格式 ---------- */
+/* 中文斜体在宋体下是机械倾斜，改用楷体表示强调；阅读字体本身是楷体时退回宋体 */
+/* 不少系统没有楷体（macOS 需另行下载、iOS/Android 没有），再加一点墨蓝色调保证可辨认 */
+.prose em { font-style: normal; font-family: var(--f-kai); color: color-mix(in srgb, var(--ink) 72%, var(--blue)); }
+:root[data-font="kai"] .prose em { font-family: var(--f-read); }
+.prose u {
+  text-decoration: underline; text-decoration-color: var(--pink); text-decoration-thickness: 1px;
+  text-underline-offset: .3em; text-decoration-skip-ink: none;
+}
+/* MR.MAN 的神经链路传音：楷体 + 下划线，再用墨蓝区分于叙述 */
+.prose em u, .prose u em { color: var(--letter); }
+.prose code.ic {
+  font-family: inherit; font-size: .94em; padding: 0 .28em; margin: 0 .08em;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+
+/* ---------- 段落样式容器（连续同 cls 的块为一组） ---------- */
+.prose .blk { margin: 1.1em 0 1.3em; }
+.prose .blk > p, .prose .blk li { text-indent: 0; }
+.prose .blk .bh { font-size: 1em; font-weight: 700; margin: .9em 0 .25em; line-height: 1.6; font-family: inherit; text-align: left; }
+.prose .blk .bh:first-child { margin-top: 0; }
+.prose .blk .cc { margin-bottom: .4em; }
+
+/* 公文 / 文件 / 病例：仿宋，左侧细墨线，缩进，紧排 */
+.prose .blk-doc {
+  font-family: var(--f-fs); line-height: 1.75;
+  margin-left: .5em; padding: .15em 0 .15em 1.1em; border-left: 2px solid var(--line-2);
+}
+.prose .blk-doc > p { margin: 0 0 .2em; }
+
+/* 书信：楷体，略缩进，墨蓝 */
+.prose .blk-letter { font-family: var(--f-kai); color: var(--letter); padding: 0 1em 0 1.5em; }
+.prose .blk-letter > p { text-indent: 2em; margin: 0 0 .3em; }
+.prose .blk-letter > p:first-child { text-indent: 0; }
+
+/* 异体字体段：楷体，保持正文版式 */
+.prose .blk-alt { font-family: var(--f-kai); }
+.prose .blk-alt > p { text-indent: 2em; margin: 0 0 calc(var(--read-lh) * .28em); }
+:root[data-font="kai"] .prose .blk-alt { font-family: var(--f-read); }
+
+/* 题记：小一号，muted，靠右 */
+.prose .blk-epi {
+  font-size: .9em; line-height: 1.85; color: var(--muted);
+  max-width: 26em; margin: .5em 0 2.4em auto; text-align: left;
+}
+.prose .blk-epi > p { margin: 0 0 .2em; }
+
+/* 系统提示 / 屏幕文字：界面字体，浅灰底，细边框，紧排 */
+.prose .blk-sys {
+  font-family: var(--f-ui); font-size: .86em; line-height: 1.6; text-align: left;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 4px;
+  padding: .55em .95em; margin: .9em 0 1.1em;
+}
+.prose .blk-sys > p { margin: .15em 0; }
+
+/* 引文 / 聊天消息：左竖线，muted */
+.prose .blk-q { border-left: 3px solid var(--line-2); padding: .1em 0 .1em 1em; color: var(--muted); }
+.prose .blk-q > p { margin: 0 0 .3em; }
+.prose .blk-q > p:last-child { margin-bottom: 0; }
+
+/* 等宽日志：逐行，保留空白 */
+.prose .blk-code {
+  font-family: var(--f-mono); font-size: .8em; line-height: 1.6; text-align: left;
+  background: var(--paper-2); border-radius: 3px; padding: .6em .9em;
+}
+.prose .blk-code > p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* 区块（文件、报告框）：细墨线边框，仿宋 */
+.prose .blk-box {
+  font-family: var(--f-fs); font-size: .95em; line-height: 1.75; text-align: left;
+  border: 1px solid var(--line-2); padding: 1em 1.2em; margin: 1.4em 0 1.6em;
+}
+.prose .blk-box > p { margin: 0 0 .25em; }
+.prose .blk-box .tbl { font-family: var(--f-ui); }
+
+/* 右对齐（落款、日期） */
+.prose .blk-right { text-align: right; }
+.prose .blk-right > p { margin: 0; }
+
+/* ---------- 列表 ---------- */
+.prose .lst { margin: .3em 0 .8em; padding-left: 2em; }
+.prose .lst li { margin: .12em 0; text-indent: 0; }
+.prose ul.lst-0 { list-style: disc; }
+.prose ul.lst-1 { list-style: circle; padding-left: 1.4em; margin: .1em 0 .2em; }
+.prose ol.lst { list-style: decimal; }
+.prose .li-sub { list-style: none; }
+.prose .lst li::marker { color: var(--muted); }
+.prose .blk-box .lst, .prose .blk-q .lst { margin: .1em 0 .3em; }
+
+/* ---------- 附录截图 ---------- */
+.prose .fig { margin: 1.2em 0 1.4em; text-align: center; text-indent: 0; }
+.prose .fig img { display: inline-block; max-width: 100%; height: auto; border: 1px solid var(--line); background: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .prose .fig img { filter: brightness(.88); } }
+:root[data-theme="dark"] .prose .fig img { filter: brightness(.88); }
+
+/* ---------- 列表项也可划线：沿用段落的热门线与定位高亮 ---------- */
+#text li[data-hot] { position: relative; }
+#text li[data-hot]::before {
+  content: ""; position: absolute; left: -2.6em; top: .45em; bottom: .45em; width: 2px;
+  background: var(--pink); opacity: .45; pointer-events: none;
+}
+#text li[data-hot="2"]::before { opacity: .7; }
+#text li[data-hot="3"]::before { width: 3px; opacity: .9; }
+#text li.rx-flash { animation: rx-flash 2.4s ease-out 1; }
+@media (prefers-reduced-motion: reduce) { #text li.rx-flash { animation: none; background-color: var(--flash); } }
+
+/* ---------- 手机宽度 ---------- */
+@media (max-width: 719px) {
+  .prose .blk-doc { margin-left: 0; padding-left: .8em; }
+  .prose .blk-letter { padding: 0 0 0 .8em; }
+  .prose .blk-epi { max-width: none; margin-left: 1.5em; }
+  .prose .blk-box { padding: .8em .85em; }
+  .prose .blk-code { font-size: .76em; padding: .5em .7em; }
+  .prose .lst { padding-left: 1.6em; }
+}
+
+/* 表格单元格的 .nw（不换行）与 reader.css「我的笔记」页的 .nw 同名，这里还原 */
+.prose .tbl td.nw { border-top: 0; padding-top: .55em; margin-top: 0; }

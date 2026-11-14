@@ -126,6 +126,17 @@ def fill_missing(wid, body, notes):
             print(f"  !! {wid}: 补字规则 {rules[k][0]!r} 命中 {n} 次")
 
 
+def plain_heads(blocks):
+    """标题本身就是粗体，去掉覆盖整个标题的 b 区间。"""
+    for b in blocks:
+        if b["t"] == "h" and b.get("m"):
+            n = len(b["x"])
+            b["m"] = [r for r in b["m"] if not (r[2] == "b" and r[0] == 0 and r[1] >= n)]
+            if not b["m"]:
+                del b["m"]
+    return blocks
+
+
 def fix(wid, body, notes):
     if wid == "shuzi-shibolie":
         a = next(i for i, b in enumerate(body) if b.get("x", "").startswith("附录：创作解析"))
@@ -206,8 +217,10 @@ def main():
         fill_missing(w["id"], d["body"], d["notes"])
         body, notes = fix(w["id"], d["body"], d["notes"])
         body = strip_edges(body, w, statements)
-        body = tidy_hr(body)
+        body = plain_heads(tidy_hr(body))
         notes = [clean_note(n, w) for n in notes]
+        for n in notes:
+            plain_heads(n["body"])
         # 章节目录：带段落样式的标题（区块内的小标题）不进目录
         toc = [b["x"] for b in body if b["t"] == "h" and not b.get("cls")]
         res = {
