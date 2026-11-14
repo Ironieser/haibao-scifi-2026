@@ -1491,6 +1491,16 @@ def convert_txt(path: Path, ctx):
     return out
 
 
+def resolve_src(root: Path, s: str) -> Path:
+    """works.json 的 src 支持 "glob:<模式>"，用于原稿文件名含个人信息、不宜写进仓库的情况。"""
+    if s.startswith("glob:"):
+        hits = sorted(root.glob(s[5:]))
+        if len(hits) != 1:
+            raise FileNotFoundError(f"{s} 匹配到 {len(hits)} 个文件")
+        return hits[0]
+    return root / s
+
+
 def convert(path: Path, ctx):
     ext = path.suffix.lower()
     if ext == ".docx":
@@ -1550,7 +1560,7 @@ def main():
                 f.unlink()
         body = []
         for s in w["src"]:
-            body.extend(convert(src_root / s, ctx))
+            body.extend(convert(resolve_src(src_root, s), ctx))
         notes = []
         for t, p in w.get("notes", []):
             ctx["note"] = True
