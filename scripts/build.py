@@ -12,7 +12,7 @@ import hashlib
 import html
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -220,18 +220,28 @@ def rich_html(x, m=None):
     return out
 
 
-def figure_html(b):
+def fig_alt(figs):
+    """附录截图的替代文字：「《作品名》创作说明截图 第 n 张」，n 按全文出现顺序（与 export.py 的 EPUB 一致）。"""
+    if not figs:
+        return "创作说明截图"
+    figs["n"] += 1
+    return f"《{figs['title']}》创作说明截图 第 {figs['n']} 张"
+
+
+def figure_html(b, figs=None):
     src = ART / "notes" / b["src"]
     v = f"?v={sha8(src.read_bytes())}" if src.exists() else ""
     return (f'<figure class="fig"><img src="/assets/notes/{esc(b["src"])}{v}" width="{int(b.get("w") or 0)}" '
-            f'height="{int(b.get("h") or 0)}" loading="lazy" decoding="async" alt="原文截图"></figure>')
+            f'height="{int(b.get("h") or 0)}" loading="lazy" decoding="async" alt="{esc(fig_alt(figs))}"></figure>')
 
 
-def render_blocks(blocks, chapter_ids=True, note_prefix=None):
+def render_blocks(blocks, chapter_ids=True, figs=None):
     """正文块 -> HTML。
     · 连续同 cls 的块包进 <div class="blk blk-<cls>">；连续 li 包进 <ul>/<ol>，lvl 1 嵌在 <li class="li-sub"> 里；
     · 正文（chapter_ids=True）里每个可划线的文本块（p、li，含带 cls 的）按顺序编 id="p-N"，c 与 h 不编号；
-    · 带 cls 的标题（区块内的小标题）不编 ch-N，与 clean.py 的目录一致。"""
+    · 带 cls 的标题（区块内的小标题）不编 ch-N，与 clean.py 的目录一致；标题层级：正文里出现章节（h2）之后用 h3，
+      之前（或全文不分章）用 h2，保证 h1 之后不直接跳到 h3；附录（chapter_ids=False）在隐藏的 h2「创作说明」之下，用 h3。
+    · figs：{"title", "n"}，给附录截图编号写替代文字。"""
     out, ch, pi = [], 0, 0
     cur_cls = None
     lists = []  # 打开的列表栈：[(tag, lvl)]
@@ -281,7 +291,8 @@ def render_blocks(blocks, chapter_ids=True, note_prefix=None):
             out.append(f'<li{pid()}>{rich_html(b["x"], b.get("m"))}</li>')
         elif t == "h":
             if cls:
-                out.append(f'<h3 class="bh">{rich_html(b["x"], b.get("m"))}</h3>')
+                hl = 3 if (ch or not chapter_ids) else 2
+                out.append(f'<h{hl} class="bh">{rich_html(b["x"], b.get("m"))}</h{hl}>')
             elif chapter_ids:
                 ch += 1
                 out.append(f'<h2 class="ch" id="ch-{ch}">{rich_html(b["x"], b.get("m"))}'
@@ -293,7 +304,7 @@ def render_blocks(blocks, chapter_ids=True, note_prefix=None):
         elif t == "hr":
             out.append('<p class="sep" role="separator" aria-label="分隔">＊＊＊</p>')
         elif t == "img":
-            out.append(figure_html(b))
+            out.append(figure_html(b, figs))
         elif t == "table":
             rows = b.get("rows") or []
             if not rows:
@@ -422,27 +433,53 @@ def og_image_tags(path):
             f'<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:image" content="{src}">')
 
 
-EXTRA_ASSETS = ("prose.css", "reader.css", "reader.js", "share.css", "share.js", "vendor/qrcode.js")
+# 作品页额外资源：正文版式（prose.css）、阅读增强（reader.*）与分享（share.*）。
+# 三个 CSS 按原顺序拼成一个 work.css（少两个阻塞请求，层叠顺序不变）；「我的笔记」页共用同一份 work.css（缓存复用）。
+# vendor/qrcode.js 不在页面里加载：share.js 打开微信二维码或生成分享图时才按 work-meta 里的 qr 地址插入。
+EXTRA_CSS = ("prose.css", "reader.css", "share.css")
+BUNDLE_CSS = "work.css"
+EXTRA_ASSETS = (BUNDLE_CSS, "reader.js", "share.js")
+
+
+def asset_url(name):
+    """复制 scripts/assets/<name> 到 dist/assets/，返回带版本号的地址；源文件缺失返回 None。"""
+    src = SRC / name
+    if not src.exists():
+        return None
+    data = src.read_bytes()
+    write(DIST / "assets" / name, data)
+    return f"/assets/{name}?v={sha8(data)}"
+
+
+def bundle_css_url():
+    parts = []
+    for name in EXTRA_CSS:
+        src = SRC / name
+        if src.exists():
+            parts.append(f"/* ---- {name} ---- */\n" + src.read_text("utf-8").rstrip() + "\n")
+    if not parts:
+        return None
+    data = "\n".join(parts).encode("utf-8")
+    write(DIST / "assets" / BUNDLE_CSS, data)
+    # 旧的单独文件（prose/reader/share.css）不删：部署后 5 分钟内仍可能有缓存的旧 HTML 引用它们
+    return f"/assets/{BUNDLE_CSS}?v={sha8(data)}"
 
 
 def extra_asset_tags(names=EXTRA_ASSETS):
-    """作品页额外资源：阅读增强（reader.*）与分享（share.*、vendor/qrcode.js）。源文件在 scripts/assets/，缺失则跳过。
-    「我的笔记」页只用 reader.*。"""
     tags = []
     for name in names:
-        src = ROOT / "scripts" / "assets" / name
-        if not src.exists():
+        url = bundle_css_url() if name == BUNDLE_CSS else asset_url(name)
+        if not url:
             continue
-        data = src.read_bytes()
-        write(DIST / "assets" / name, data)
-        url = f"/assets/{name}?v={sha8(data)}"
         tags.append(f'<link rel="stylesheet" href="{url}">' if name.endswith(".css")
                     else f'<script src="{url}" defer></script>')
     return "\n".join(tags)
 
 
-def shell(ctx, *, title, desc, path, page, body, body_attrs="", og_type="website", extra_head=""):
+def shell(ctx, *, title, desc, path, page, body, body_attrs="", og_type="website", extra_head="", canonical=True):
     url = SITE + path
+    canon = (f'<link rel="canonical" href="{esc(url)}">\n' if canonical else "")
+    og_url = (f'<meta property="og:url" content="{esc(url)}">\n' if canonical else "")
     font_preload = ""
     if ctx.font_v:
         font_preload = (f'<link rel="preload" href="{FONT_PATH}?v={ctx.font_v}" as="font" '
@@ -454,14 +491,12 @@ def shell(ctx, *, title, desc, path, page, body, body_attrs="", og_type="website
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(title)}</title>
 <meta name="description" content="{esc(desc)}">
-<link rel="canonical" href="{esc(url)}">
-<meta property="og:type" content="{og_type}">
+{canon}<meta property="og:type" content="{og_type}">
 <meta property="og:site_name" content="海豹杯 2026 获奖作品集">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
-<meta property="og:url" content="{esc(url)}">
-{og_image_tags(path)}
+{og_url}{og_image_tags(path)}
 <meta name="theme-color" content="#EEEFEA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#17192B" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -715,7 +750,8 @@ def home_facts(meta, works, by_id, n_both, n_h, n_a):
         return (f'<li class="fact {cls}"><div class="f-fig">{fig}</div>'
                 f'<h3>{h}</h3><p>{p}</p></li>')
 
-    return ('<section class="facts wrap" aria-label="这次评奖的几个特别之处"><ul class="facts-in">'
+    return ('<section class="facts wrap" aria-labelledby="facts-h"><h2 class="sr" id="facts-h">这次评奖的几个特别之处</h2>'
+            '<ul class="facts-in">'
             + cell("fact-both", venn, f"两份名单只重合 {n_both} 部",
                    "同一批稿子，人类评委与 AI 评委的选择差别很大。")
             + cell("fact-pow", bars_html, "AI 评委的奖金是 2 的幂",
@@ -867,14 +903,17 @@ def build_work(ctx, meta, works, by_id, w):
         panel_toc = (f'<div class="panel" id="panel-toc" role="dialog" aria-label="目录" hidden>'
                      f'<h2>目录</h2><ol>{lis}</ol></div>')
 
+    figs = {"title": plain(w["title"]), "n": 0}
+    body_html = render_blocks(ct["body"], figs=figs)
     notes_html = ""
     if ct.get("notes"):
         items = []
         for n in ct["notes"]:
             nchars = sum(len(plain(b.get("x", ""))) for b in n["body"])
             items.append(f'<details class="note"><summary>{esc(n["title"])}<span>{nchars} 字</span></summary>'
-                         f'<div class="prose">{render_blocks(n["body"], chapter_ids=False)}</div></details>')
-        notes_html = f'<section class="notes" aria-label="创作说明">{"".join(items)}</section>'
+                         f'<div class="prose">{render_blocks(n["body"], chapter_ids=False, figs=figs)}</div></details>')
+        notes_html = (f'<section class="notes" aria-labelledby="notes-h"><h2 class="sr" id="notes-h">创作说明</h2>'
+                      f'{"".join(items)}</section>')
 
     pn = '<nav class="pn" aria-label="上一部与下一部">'
     if prev_w:
@@ -912,8 +951,8 @@ def build_work(ctx, meta, works, by_id, w):
 <div class="resume" id="resume" hidden><p>上次读到 <b class="pct"></b>。</p><button type="button" class="btn btn-primary go">继续上次阅读</button><button type="button" class="x">从头读</button></div>
 {stmt}
 {toc_html}
-<div class="prose" id="text">
-{render_blocks(ct['body'])}
+<div class="prose" id="text" data-chars="{w['chars']}">
+{body_html}
 </div>
 <div class="the-end" role="separator" aria-label="正文完"><span class="ovp-dots" aria-hidden="true"><i></i><i></i></span></div>
 {notes_html}
@@ -936,7 +975,7 @@ def build_work(ctx, meta, works, by_id, w):
 </div>
 </article>
 </main>
-<div class="dock js-only" role="group" aria-label="阅读工具">
+<div class="dock js-only is-tucked" role="group" aria-label="阅读工具">
 <p class="dock-pct" id="dock-pct" hidden><b class="n"></b><span class="t"></span></p>
 {'<button type="button" data-panel="panel-toc" aria-expanded="false" aria-controls="panel-toc">目录</button>' if toc else ''}
 <button type="button" data-panel="panel-set" aria-expanded="false" aria-controls="panel-set" aria-label="阅读设置">Aa</button>
@@ -949,7 +988,7 @@ def build_work(ctx, meta, works, by_id, w):
     write(DIST / "works" / wid / "index.html",
           shell(ctx, title=title, desc=desc, path=f"/works/{wid}/", page="work", body=body,
                 body_attrs=f' data-work="{wid}"', og_type="article",
-                extra_head=work_meta_json(w) + extra_asset_tags() + "\n"))
+                extra_head=work_meta_json(w, asset_url("vendor/qrcode.js")) + extra_asset_tags() + "\n"))
 
 
 def settings_panel():
@@ -979,7 +1018,7 @@ def settings_panel():
             + '<p class="pnote">快捷键：← → 或空格翻屏，J / K 下一章、上一章。</p>\n</div>')
 
 
-def work_meta_json(w):
+def work_meta_json(w, qr=None):
     """供 reader.js / share.js 使用的作品元数据（type=application/json 不会执行，CSP 安全）。"""
     data = {
         "id": w["id"], "title": plain(w["title"]), "author": w["author"],
@@ -989,6 +1028,7 @@ def work_meta_json(w):
         "awards": [award_full(a) for a in w["awards"]],
         "chars": w["chars"],
         "txt": f"/downloads/{w['id']}.txt", "epub": f"/downloads/{w['id']}.epub",
+        "qr": qr,
     }
     js = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     return f'<script type="application/json" id="work-meta">{js}</script>\n'
@@ -1042,7 +1082,7 @@ def build_notes(ctx, works):
           shell(ctx, title="我的笔记｜海豹杯 2026", desc="你在本设备上的划线与笔记。",
                 path="/notes/", page="notes", body=body,
                 extra_head='<meta name="robots" content="noindex">\n'
-                + extra_asset_tags(("reader.css", "reader.js")) + "\n"))
+                + extra_asset_tags((BUNDLE_CSS, "reader.js")) + "\n"))
 
 
 def build_404(ctx):
@@ -1053,7 +1093,7 @@ def build_404(ctx):
 <div class="hero-actions"><a class="btn btn-primary" href="/">回到首页</a><a class="btn" href="/#works">浏览全部作品</a></div>
 </main>"""
     write(DIST / "404.html", shell(ctx, title="页面没有找到｜海豹杯 2026", desc="页面没有找到。",
-                                   path="/404.html", page="404", body=body,
+                                   path="/404.html", page="404", body=body, canonical=False,
                                    extra_head='<meta name="robots" content="noindex">\n'))
 
 
@@ -1067,6 +1107,7 @@ def build_static(works):
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Content-Security-Policy: {csp}
+  Strict-Transport-Security: max-age=31536000
 
 /assets/*
   ! Cache-Control
@@ -1082,10 +1123,12 @@ def build_static(works):
 """
     write(DIST / "_headers", headers)
     write(DIST / "robots.txt", f"User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: {SITE}/sitemap.xml\n")
-    urls = ["/"] + [f"/works/{w['id']}/" for w in works]
+    # /favorites/、/notes/ 是本机数据页（noindex），不进 sitemap；lastmod 写构建日期
+    urls = ["/"] + [f"/works/{w['id']}/" for w in works] + ["/stats/"]
+    today = date.today().isoformat()
     sm = ['<?xml version="1.0" encoding="UTF-8"?>',
           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    sm += [f"  <url><loc>{SITE}{u}</loc></url>" for u in urls]
+    sm += [f"  <url><loc>{SITE}{u}</loc><lastmod>{today}</lastmod></url>" for u in urls]
     sm.append("</urlset>\n")
     write(DIST / "sitemap.xml", "\n".join(sm))
     write(DIST / "favicon.svg", FAVICON)

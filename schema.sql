@@ -22,3 +22,22 @@ CREATE INDEX IF NOT EXISTS mark_counts_top ON mark_counts (work, n) WHERE n >= 2
 CREATE TABLE IF NOT EXISTS views (page TEXT NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (page, day)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS uv (day TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS visitors (day TEXT NOT NULL, actor TEXT NOT NULL, PRIMARY KEY (day, actor)) WITHOUT ROWID;
+-- 浏览量汇总（增量维护，避免对 views 全表 GROUP BY）：
+--   view_totals 每个页面一行累计 PV（行数 ≤ 页面白名单，约 25 行）；
+--   views 中 page = '*' 的行是每日全站 PV（近 30 天走势按主键前缀 (page='*', day>=?) 读取 30 行）。
+-- 由 src/views.js 的 flush 同时维护；已有数据用 scripts/migrate_views.sql 一次性回填（可重复执行）。
+CREATE TABLE IF NOT EXISTS view_totals (page TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID;
+
+-- 片段级热门划线（公开、匿名，只存字符区间，不存笔记）：
+--   mark_ranges：某读者（actor 为 SHA-256 哈希）在某段的划线区间并集 segs = JSON [[s,e],...]（已排序、合并，≤ 20 个）。
+--     该段没有划线时删除这一行。
+--   hot_cov：某段的覆盖计数，cov = 游程编码 JSON [[s,e,n],...]（n ≥ 1，相邻同值已合并），maxn = 段内最大覆盖人数；
+--     tok 为每次写入生成的随机令牌，用于乐观并发控制（比较并交换，见 functions/api/[[path]].js handlePostHot）。
+--   mark_actors / work_highlighters：作品「有划线的读者数」，actor 首次在该作品划线时 +1（之后不减）。
+CREATE TABLE IF NOT EXISTS mark_ranges (work TEXT NOT NULL, p INTEGER NOT NULL, actor TEXT NOT NULL, segs TEXT NOT NULL, PRIMARY KEY (work, p, actor)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS hot_cov (work TEXT NOT NULL, p INTEGER NOT NULL, cov TEXT NOT NULL, maxn INTEGER NOT NULL DEFAULT 0, tok TEXT NOT NULL DEFAULT '', PRIMARY KEY (work, p)) WITHOUT ROWID;
+-- 热门片段查询（WHERE work = ? AND maxn >= 3 ORDER BY maxn DESC LIMIT 50）走此部分索引；
+-- 条件 maxn >= 3 须与代码中的 HOT_MIN 一致（查询里也要写字面量 3，SQLite 才会选用部分索引）。
+CREATE INDEX IF NOT EXISTS hot_cov_top ON hot_cov (work, maxn) WHERE maxn >= 3;
+CREATE TABLE IF NOT EXISTS mark_actors (work TEXT NOT NULL, actor TEXT NOT NULL, PRIMARY KEY (work, actor)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS work_highlighters (work TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID;

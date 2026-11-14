@@ -54,6 +54,8 @@
   function api(method, path, body) {
     if (!W.fetch) return Promise.reject(apiError('当前浏览器不支持互动功能', 0, true));
     var opt = { method: method, headers: { 'Accept': 'application/json' }, credentials: 'same-origin' };
+    // GET 接口有边缘缓存；浏览器端不要沿用本地缓存副本（线上 zone 的 Browser Cache TTL 曾把计数缓存 4 小时）
+    if (method === 'GET') opt.cache = 'no-cache';
     if (body) {
       body.device = device();
       opt.headers['Content-Type'] = 'application/json';
@@ -69,6 +71,26 @@
         return data;
       }, function () { throw apiError('服务器返回了无法识别的内容', r.status, true); });
     }, function () { throw apiError('网络连接失败，请稍后再试', 0, true); });
+  }
+
+  /* ---------- 页面打开时的唯一一次请求：POST /api/hit ----------
+     记一次浏览，并一次性取回本页需要的公开数据：浏览量、点赞/收藏/评论数、作品页的热门划线、首页的最新讨论、
+     /stats/ 的近 30 天走势。site.js、views.js、reader.js 共用同一个 Promise（只发一次请求）。评论列表仍按需加载。 */
+  var hitP = null;
+  var VIEW_PAGES = ['home', 'favorites', 'notes', 'stats'];   // 与服务端白名单一致；其余页面（如 404）记为 other
+  function pageKey() {
+    var work = D.body.getAttribute('data-work');
+    if (work) return work;
+    return VIEW_PAGES.indexOf(page) >= 0 ? page : 'other';
+  }
+  function hit() {
+    if (hitP) return hitP;
+    var work = D.body.getAttribute('data-work') || '';
+    var body = { page: pageKey() };
+    if (work) { body.work = work; body.hot = prefs().hot; }  // 读者关闭了「热门划线」时不取
+    hitP = api('POST', '/api/hit', body);
+    hitP.catch(function () { /* 各调用方自行降级 */ });
+    return hitP;
   }
 
   /* ---------- 提示 ---------- */
@@ -195,7 +217,7 @@
     initRecent();
   }
 
-  // 全部作品书架：筛选、排序；阅读量（/api/views）与点赞评论数（/api/stats）到了才开放对应排序
+  // 全部作品书架：筛选、排序；阅读量与点赞评论数（都来自 /api/hit）到了才开放对应排序
   function initShelf(list) {
     var books = $$('.book', list);
     var filter = 'all', sort = 'award';
@@ -243,8 +265,8 @@
     enable('likes', false);
     apply();
 
-    api('GET', '/api/stats').then(function (data) {
-      var works = data && data.works;
+    hit().then(function (d) {
+      var works = d && d.stats && d.stats.works;
       if (!works) return;
       books.forEach(function (b) {
         var s = works[b.getAttribute('data-id')];
@@ -260,9 +282,9 @@
       if (sort === 'likes') apply();
     }, function () { /* 计数保持隐藏 */ });
 
-    // 数字本身由 views.js 填进 [data-views-page]；这里只取排序用的数据（同一接口有边缘缓存）
-    api('GET', '/api/views').then(function (data) {
-      var pages = data && data.pages;
+    // 数字本身由 views.js 填进 [data-views-page]；这里只取排序用的数据（同一个 hit 响应）
+    hit().then(function (d) {
+      var pages = d && d.views && d.views.pages;
       if (!pages) return;
       books.forEach(function (b) { b.setAttribute('data-views', String(pages[b.getAttribute('data-id')] || 0)); });
       enable('views', true);
@@ -279,7 +301,8 @@
       var t = $('.b-t', b);
       if (t) titles[b.getAttribute('data-id')] = t.textContent;
     });
-    api('GET', '/api/comments/recent').then(function (data) {
+    hit().then(function (d) {
+      var data = d && d.recent;
       var cs = (data && Array.isArray(data.comments) ? data.comments : []).filter(function (c) {
         return c && titles[c.work] && typeof c.body === 'string';
       }).slice(0, 8);
@@ -323,8 +346,8 @@
         $('.c', favBtn).textContent = counts.favs === null ? '' : fmtNum(counts.favs);
       }
     }
-    api('GET', '/api/stats').then(function (data) {
-      var s = data && data.works && data.works[id];
+    hit().then(function (d) {
+      var s = d && d.stats && d.stats.works && d.stats.works[id];
       if (!s) return;
       counts.likes = s.likes || 0; counts.favs = s.favs || 0;
       paint();
@@ -404,6 +427,8 @@
     var cum = [], total = 0;
     lens.forEach(function (n) { cum.push(total); total += n; });
     total = Math.max(1, total);
+    /* 剩余时间与页头「约 x 分钟读完」同一口径：build.py 输出的 data-chars（正文字数）÷ 500 字/分钟，按已读比例折算 */
+    var readChars = parseInt(text.getAttribute('data-chars'), 10) || total;
 
     /* 布局缓存：块相对 #text 顶部的位置；#text 尺寸变化（字号、行距、字体加载）时失效 */
     var L = null;
@@ -464,15 +489,29 @@
     if (W.ResizeObserver) new ResizeObserver(function () { L = null; schedule(); }).observe(text);
     W.addEventListener('resize', function () { L = null; schedule(); });
 
-    /* 继续上次阅读 */
+    /* 继续上次阅读
+       带锚点进入（#p-N 段落链接、#ch-N、#talk…）时页面落在锚点处，不是上次读到的位置：设 guard，
+       只有读到比已保存位置更靠后才覆盖记录（打开别人分享的段落不会冲掉自己的进度）；
+       上次的位置更靠后时，提示条浮在底部（正文开头的提示条此时不在视口里），仍可一键回去。 */
     var saved = readPos(id), initial = ratio(), guard = null;
-    var resume = $('#resume');
-    if (resume && saved && saved.r > initial + 0.02 && saved.r < 0.98 && !location.hash && W.pageYOffset < 200) {
+    var resume = $('#resume'), fromHash = !!location.hash, hashEl = null;
+    if (fromHash) { try { hashEl = D.getElementById(decodeURIComponent(location.hash.slice(1))); } catch (e) { hashEl = null; } }
+    if (fromHash && saved) guard = saved.r;
+    // 锚点处的阅读比例（与 ratio() 同口径：锚点在基准线时视口底部读到哪里）；锚点在正文之后（讨论区）算读完
+    var here = initial;
+    if (hashEl) here = text.contains(hashEl)
+      ? Math.min(1, charsAt(hashEl.getBoundingClientRect().top + W.pageYOffset - textTop() - TOP_LINE + W.innerHeight) / total)
+      : 1;
+    if (resume && saved && saved.r > here + 0.02 && saved.r < 0.98 && (hashEl || (!fromHash && W.pageYOffset < 200))) {
       guard = saved.r;  // 提示未处理前，只有读到比上次更靠后才覆盖记录
       $('.pct', resume).textContent = Math.round(saved.r * 100) + '%';
+      if (hashEl) { resume.classList.add('is-float'); $('.x', resume).textContent = '留在这里'; }
       resume.hidden = false;
-      $('.go', resume).addEventListener('click', function () { resume.hidden = true; guard = null; goTo(saved); initial = ratio(); });
-      $('.x', resume).addEventListener('click', function () { resume.hidden = true; guard = null; });
+      $('.go', resume).addEventListener('click', function () {
+        resume.hidden = true; resume.classList.remove('is-float'); guard = null; goTo(saved); initial = ratio();
+      });
+      // 「从头读」：之后按新的位置记录；「留在这里」（锚点进入）：只关掉提示，guard 保留
+      $('.x', resume).addEventListener('click', function () { resume.hidden = true; if (!hashEl) guard = null; });
     }
     function save() {
       var a = anchor();
@@ -518,7 +557,7 @@
       D.body.classList.toggle('is-reading', reading);
       setChapter(reading ? headAt(rel + 8) : -2);
       if (dockPct) {
-        var left = Math.ceil(total * (1 - r) / 500), t;
+        var left = Math.max(1, Math.round(readChars * (1 - r) / 500)), t;
         if (r >= 0.995) t = '读完了';
         else if (left >= 60) t = '剩 ' + Math.floor(left / 60) + ' 小时' + (left % 60 ? ' ' + (left % 60) + ' 分' : '');
         else t = '剩 ' + left + ' 分钟';
@@ -886,21 +925,83 @@
     render();
   }
 
-  // 操作条可见时收起浮动的阅读工具（只在窄屏的 CSS 中生效），面板打开时不收起
+  // 读者越过操作条（操作条滚出视口上方）之前收起浮动的阅读工具（只在窄屏的 CSS 中生效）：
+  // 首屏的标题、元信息、操作条可能比一屏高，只看「操作条是否可见」时工具条会压在元信息上。面板打开时不收起。
+  // HTML 里默认带 is-tucked，避免首帧闪现；不支持 IntersectionObserver 时直接显示。
   function tuckDock() {
     var dock = document.querySelector('.dock'), bar = document.querySelector('.actions');
-    if (!dock || !bar || !('IntersectionObserver' in window)) return;
+    if (!dock) return;
+    if (!bar || !('IntersectionObserver' in window)) { dock.classList.remove('is-tucked'); return; }
     new IntersectionObserver(function (es) {
-      var open = dock.querySelector('[aria-expanded="true"]');
-      dock.classList.toggle('is-tucked', es[0].isIntersecting && !open);
+      var e = es[es.length - 1], open = dock.querySelector('[aria-expanded="true"]');
+      var passed = !e.isIntersecting && e.boundingClientRect.bottom <= 0;
+      dock.classList.toggle('is-tucked', !passed && !open);
     }).observe(bar);
   }
 
+  /* ---------- 下载：微信内置浏览器会拦截 TXT / EPUB / ZIP 下载 ----------
+     在微信里点下载链接时不跳转，改为提示「在浏览器打开」（样式与分享的微信引导共用 .sh-wx）。地址加 ?wx=1 可在普通浏览器调试。 */
+  var IN_WX = /MicroMessenger/i.test(navigator.userAgent || '') || /[?&]wx=1(?:&|$)/.test(location.search || '');
+  var dlGuide = null, dlOpener = null;
+  function hideDlGuide() {
+    if (!dlGuide || dlGuide.hidden) return;
+    dlGuide.hidden = true;
+    H.classList.remove('sh-open');
+    if (dlOpener && dlOpener.focus) { try { dlOpener.focus({ preventScroll: true }); } catch (e) { dlOpener.focus(); } }
+    dlOpener = null;
+  }
+  function showDlGuide(opener) {
+    if (!dlGuide) {
+      dlGuide = el('div', 'sh-wx');
+      dlGuide.setAttribute('role', 'dialog');
+      dlGuide.setAttribute('aria-modal', 'true');
+      dlGuide.setAttribute('aria-labelledby', 'dl-wx-t');
+      dlGuide.tabIndex = -1;
+      dlGuide.innerHTML =
+        '<svg class="sh-wx-arrow" viewBox="0 0 120 140" aria-hidden="true" focusable="false">' +
+        '<path d="M14 132C22 82 52 46 96 22" fill="none" stroke-width="5" stroke-linecap="round"/>' +
+        '<path d="M70 16l30 4-10 28" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      var p = el('p', 'sh-wx-t');
+      p.id = 'dl-wx-t';
+      p.appendChild(D.createTextNode('微信内无法直接下载，请点右上角 '));
+      var dots = el('span', 'sh-wx-dots', '···');
+      dots.setAttribute('aria-label', '更多');
+      p.appendChild(dots);
+      p.appendChild(D.createTextNode(' 选择「在浏览器打开」后再下载'));
+      var ok = el('button', 'btn sh-wx-ok', '知道了');
+      ok.type = 'button';
+      dlGuide.appendChild(p);
+      dlGuide.appendChild(ok);
+      dlGuide.hidden = true;
+      D.body.appendChild(dlGuide);
+      dlGuide.addEventListener('click', hideDlGuide);
+      dlGuide.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' || ev.key === 'Esc') { ev.preventDefault(); ev.stopPropagation(); hideDlGuide(); }
+        if (ev.key === 'Tab') { ev.preventDefault(); ok.focus(); }
+      });
+    }
+    dlOpener = opener || null;
+    dlGuide.hidden = false;
+    H.classList.add('sh-open');
+    dlGuide.querySelector('.sh-wx-ok').focus();
+  }
+  function initDownloads() {
+    if (!IN_WX) return;
+    D.addEventListener('click', function (ev) {
+      var a = ev.target.closest && ev.target.closest('a[href]');
+      if (!a || !/^\/downloads\//.test(a.getAttribute('href') || '')) return;
+      ev.preventDefault();
+      showDlGuide(a);
+    });
+  }
+
   // 共享给 reader.js / share.js 的工具（它们在 site.js 之后加载，均为 defer）
-  W.HB = { toast: toast, api: api, copyText: copyText, device: device, jget: jget, jset: jset, el: el, prefs: prefs, savePrefs: savePrefs,
+  W.HB = { toast: toast, api: api, hit: hit, copyText: copyText, device: device, jget: jget, jset: jset, el: el, prefs: prefs, savePrefs: savePrefs,
     readPos: readPos, keepPosition: function (fn) { keepPosition(fn); } };
 
   device();
+  hit();  // 尽早发出（不等各区块初始化）
+  initDownloads();
   if (page === 'home') initHome();
   else if (page === 'work') { initWork(); tuckDock(); }
   else if (page === 'favorites') initFavorites();

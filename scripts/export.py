@@ -21,7 +21,7 @@ CONTENT = ROOT / "content" / "works"
 ART_NOTES = ROOT / "art" / "notes"
 OUT = ROOT / "dist" / "downloads"
 SITE = "https://scifi.ironieser.cc"
-SOURCE_LINE = "2026年海豹杯科幻文学大赛获奖作品 · 版权归作者所有"
+SOURCE_LINE = "2026年海豹杯科幻文学大赛获奖作品，版权归作者所有"
 ALL_ZIP = "haibao2026-all.zip"
 # 固定 zip 内时间戳，保证重复构建产物一致
 ZIP_TIME = (2026, 11, 14, 20, 17, 0)
@@ -204,13 +204,13 @@ code.ic { font-family: inherit; border: 1px solid #bbb; padding: 0 0.2em; }
 .blk p { text-indent: 0; }
 .bh { font-weight: bold; text-indent: 0; margin-top: 0.6em; }
 .blk-doc { font-family: FangSong, STFangsong, serif; border-left: 2px solid #999; padding-left: 1em; margin-left: 0.5em; }
-.blk-letter { font-family: "Kaiti SC", STKaiti, KaiTi, serif; color: #2A4170; padding-left: 1.5em; }
+.blk-letter { font-family: "Kaiti SC", STKaiti, KaiTi, serif; padding-left: 1.5em; border-left: 1px solid #999; }
 .blk-letter p { text-indent: 2em; }
 .blk-alt { font-family: "Kaiti SC", STKaiti, KaiTi, serif; }
 .blk-alt p { text-indent: 2em; }
-.blk-epi { font-size: 0.9em; color: #555; margin-left: 30%; margin-bottom: 2em; }
-.blk-sys { font-family: sans-serif; font-size: 0.88em; border: 1px solid #bbb; background: #f2f2f2; padding: 0.4em 0.8em; }
-.blk-q { border-left: 3px solid #aaa; padding-left: 1em; color: #555; }
+.blk-epi { font-size: 0.9em; opacity: 0.8; margin-left: 30%; margin-bottom: 2em; }
+.blk-sys { font-family: sans-serif; font-size: 0.88em; border: 1px solid #999; border-left-width: 3px; padding: 0.4em 0.8em; }
+.blk-q { border-left: 3px solid #aaa; padding-left: 1em; opacity: 0.8; }
 .blk-code { font-family: monospace; font-size: 0.82em; white-space: pre-wrap; line-height: 1.5; }
 .blk-box { font-family: FangSong, STFangsong, serif; border: 1px solid #888; padding: 0.8em 1em; }
 .blk-right p { text-align: right; }
@@ -260,8 +260,9 @@ def rich_xhtml(x, m=None):
     return "".join(out)
 
 
-def blocks_xhtml(blocks, hlevel=2, hid=None, images=None):
-    """images: src -> EPUB 内路径（make_epub 负责打包）。"""
+def blocks_xhtml(blocks, hlevel=2, hid=None, images=None, figs=None):
+    """images: src -> EPUB 内路径（make_epub 负责打包）。
+    figs: {"title", "n"}，附录截图按全书出现顺序编号写替代文字（与网页一致）。"""
     out = []
     cur_cls = None
     lists = []
@@ -315,8 +316,13 @@ def blocks_xhtml(blocks, hlevel=2, hid=None, images=None):
             out.append("<hr/>")
         elif t == "img":
             href = (images or {}).get(b["src"])
+            if figs is not None:
+                figs["n"] += 1
+                alt = f"《{figs['title']}》创作说明截图 第 {figs['n']} 张"
+            else:
+                alt = "创作说明截图"
             if href:
-                out.append(f'<figure class="fig"><img src="{attr(href)}" alt="原文截图"/></figure>')
+                out.append(f'<figure class="fig"><img src="{attr(href)}" alt="{attr(alt)}"/></figure>')
             else:
                 out.append('<p class="center">〔原文截图〕</p>')
         elif t == "table":
@@ -403,23 +409,24 @@ def make_epub(meta, w):
     add("title.xhtml", titlepage_xhtml(meta, w), "application/xhtml+xml", "titlepage")
 
     nav_items = [("title.xhtml", "标题页")]
+    figs = {"title": plain(w["title"]), "n": 0}
     chapters = split_chapters(w)
     hno = 0  # 章节锚点与网站一致：ch-<toc 序号>，从 1 起
     for i, (title, blocks) in enumerate(chapters, 1):
         path = f"chapter-{i:03d}.xhtml"
         if blocks and blocks[0]["t"] == "h" and not blocks[0].get("cls"):
             hno += 1
-            body = blocks_xhtml(blocks, hid=f"ch-{hno}", images=images)
+            body = blocks_xhtml(blocks, hid=f"ch-{hno}", images=images, figs=figs)
         else:
-            body = blocks_xhtml(blocks, images=images)
+            body = blocks_xhtml(blocks, images=images, figs=figs)
         sec = f'<section epub:type="chapter">\n{body}\n</section>'
-        add(path, xhtml_doc(f"{w['title']} · {title}" if len(chapters) > 1 else w["title"], sec),
+        add(path, xhtml_doc(f"《{w['title']}》{title}" if len(chapters) > 1 else w["title"], sec),
             "application/xhtml+xml", f"ch{i:03d}")
         nav_items.append((path, title))
     for i, n in enumerate(w["notes"], 1):
         path = f"appendix-{i}.xhtml"
         ntitle = plain(n["title"]).strip()
-        body = f"<h2>附录：{attr(ntitle)}</h2>\n" + blocks_xhtml(n["body"], hlevel=3, images=images)
+        body = f"<h2>附录：{attr(ntitle)}</h2>\n" + blocks_xhtml(n["body"], hlevel=3, images=images, figs=figs)
         sec = f'<section epub:type="appendix">\n{body}\n</section>'
         add(path, xhtml_doc(f"附录：{ntitle}", sec), "application/xhtml+xml", f"app{i}")
         nav_items.append((path, f"附录：{ntitle}"))

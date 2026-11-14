@@ -81,6 +81,13 @@ build.py 不能删除 dist/downloads 和 dist/assets/fonts（其他脚本的产�
 - `POST /api/comments/:cid/like` `{device, on}` → `{ on, likes }`。
 - `DELETE /api/comments/:cid`：请求头 `Authorization: Bearer <ADMIN_TOKEN>`（环境变量）或请求体 device 与发表者一致 → 软删除，`{ok:true}`。
 - 错误统一 `{error: "中文说明"}` + 合适状态码。
+- `POST /api/hit` `{page, device, work?, hot?, recent?, series?}` → `{views:{total, today:{pv,uv}, pages}, stats:{works}, hot?, recent?, series?}`。**页面打开时唯一的请求**：记一次浏览（内存批量写入）并返回本页需要的公开数据；hot 仅作品页且读者未关闭「热门划线」（前端传 `hot:false`），recent 仅首页，series（近 30 天）仅 /stats/。各部分仍按各自的边缘缓存键缓存（与下列 GET 接口共用），未命中的部分合并成一个 D1 batch。白名单外的页面记为 `other`。同一 IP 每分钟 120 次（isolate 内存计数）。
+- `GET /api/works/:id/hot` → `{threshold, readers, segs:[{p,s,e,n}]}`，缓存 60 秒。阈值 `max(3, ceil(0.02 × 有划线读者数))`，每部作品最多 50 个片段（n 最高者）。
+- `POST /api/works/:id/hot` `{device, items:[{p, segs:[[s,e],...]}]}` → `{ok, done:[p], failed:[p]}`。某段划线集合变化时上传该段区间并集（空数组 = 撤销）；只传区间，不传笔记与原文。校验：1–30 段、p 1–5000、每段 ≤ 20 个区间、`0 ≤ s < e ≤ 5000` 整数。限流：同一设备每天 300 段次（与旧接口共用）。
+- `GET /api/views/series` → `{series:[{day,pv,uv}]}`（30 天），缓存 300 秒。
+- 旧接口 `POST /api/view`、`GET /api/views`、`GET /api/stats`、`GET /api/comments/recent`、`GET/POST /api/works/:id/marks` 保留（兼容已缓存的旧页面），新前端不再调用（评论列表仍按需 GET）。
+- 所有 /api 响应在出口统一重设 `Cache-Control`（可缓存的为 `public, max-age=<短 TTL>`，其余 `no-store`），不沿用边缘缓存命中时带回的头；前端 GET 用 `cache:'no-cache'`。
+- 写接口另有 IP 软限流：点赞 + 收藏 + 评论点赞 + 划线同步合计每 IP 每天 2000 次；评论为「设备 15 秒 1 条、每天 50 条」+「IP 15 秒 5 条、每天 300 条」。
 
 D1 表（schema.sql）：
 ```sql
@@ -92,6 +99,8 @@ CREATE TABLE IF NOT EXISTS comment_likes (cid INTEGER NOT NULL, actor TEXT NOT N
 CREATE TABLE IF NOT EXISTS ratelimit (key TEXT PRIMARY KEY, n INTEGER NOT NULL, reset INTEGER NOT NULL);
 ```
 counters.kind ∈ {like, fav, comment}。
+增量表（见 schema.sql，均 `CREATE ... IF NOT EXISTS`）：`view_totals`（每页累计 PV）与 `views` 中 `page='*'` 的每日全站行（已有数据用 `scripts/migrate_views.sql` 回填，可重复执行）；片段级热门划线 `mark_ranges`（每读者每段的区间并集）、`hot_cov`（每段覆盖计数游程编码 + maxn + 并发令牌 tok，部分索引 `hot_cov_top (work, maxn) WHERE maxn >= 3`）、`mark_actors` / `work_highlighters`（有划线的读者数）。
+前端本地状态另有：`hb.hotq.<id>` 待同步到热门划线的段落编号；`hb.hotv.<id>` 已有划线已整体同步过一次的标记。
 
 ## 质量底线
 手机宽度可用（16px 边距，无横向滚动）；键盘焦点可见；对比度合格；无 JS 时正文与名单照常可读（交互降级）；HTML `lang="zh-CN"`，每页有 `<title>`、description、Open Graph。

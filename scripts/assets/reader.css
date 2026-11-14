@@ -1,15 +1,25 @@
-/* 海豹杯 2026 — 阅读增强：划线、笔记、热门划线、段落高亮，以及「我的笔记」页。
+/* 海豹杯 2026 — 阅读增强：划线、笔记、热门划线（片段级虚线）、段落高亮，以及「我的笔记」页。
    颜色沿用套印：黄 = 马克笔，粉 / 蓝 / 墨 = 下划线。 */
 
 :root {
   --hl-y: rgba(255, 232, 0, .78);
   --flash: rgba(255, 72, 176, .24);
   --hl-del: #FF7CC6;   /* 工具条底色为墨色：用浅粉 */
+  --hot-line: rgba(30, 33, 64, .62);      /* 热门划线虚线：墨色半透明，纸色 / 护眼绿 / 羊皮背景上都清楚 */
+  --hot-bg: rgba(0, 120, 191, .13);       /* 气泡打开时片段的底色（套印蓝） */
+  --hot-shadow: var(--blue);
 }
+:root[data-bg="green"], :root[data-bg="sepia"] { --hot-line: rgba(30, 33, 64, .7); --hot-bg: rgba(0, 120, 191, .15); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --hl-y: rgba(255, 232, 0, .30); --flash: rgba(255, 72, 176, .30); --hl-del: #B8006B; }
+  :root:not([data-theme="light"]) {
+    --hl-y: rgba(255, 232, 0, .30); --flash: rgba(255, 72, 176, .30); --hl-del: #B8006B;
+    --hot-line: rgba(230, 231, 238, .62); --hot-bg: rgba(80, 170, 240, .22);
+  }
 }
-:root[data-theme="dark"] { --hl-y: rgba(255, 232, 0, .30); --flash: rgba(255, 72, 176, .30); --hl-del: #B8006B; }
+:root[data-theme="dark"] {
+  --hl-y: rgba(255, 232, 0, .30); --flash: rgba(255, 72, 176, .30); --hl-del: #B8006B;
+  --hot-line: rgba(230, 231, 238, .62); --hot-bg: rgba(80, 170, 240, .22);
+}
 
 #text { position: relative; }
 
@@ -41,21 +51,38 @@ mark.hl:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .rx-note-blue { --c: var(--blue); }
 .rx-note-ink { --c: var(--ink); }
 
-/* ---------- 热门划线：段落左侧细线 + 行尾小字，克制，不可选中 ---------- */
-#text p[data-hot] { position: relative; }
-#text p[data-hot]::before {
-  content: ""; position: absolute; left: -12px; top: .45em; bottom: .45em; width: 2px;
-  background: var(--pink); opacity: .45; pointer-events: none;
+/* ---------- 热门划线（多人划过的片段）：细虚线下划线，紧贴文字；本人划线的实线下划线更低更粗，两者可叠加 ----------
+   优先用 CSS Custom Highlight API（::highlight，不改 DOM）；不支持时 reader.js 退回 <mark class="hot"> 包裹。 */
+::highlight(hb-hot) {
+  text-decoration-line: underline; text-decoration-style: dashed; text-decoration-color: var(--hot-line);
+  text-decoration-thickness: 1.5px; text-underline-offset: .14em;
 }
-#text p[data-hot="2"]::before { opacity: .7; }
-#text p[data-hot="3"]::before { width: 3px; opacity: .9; }
-@media (max-width: 719px) { #text p[data-hot]::before { left: -10px; } }
-.rx-hot {
-  display: inline-block; margin-left: .7em; text-indent: 0; vertical-align: .08em;
-  font: 12px/1 var(--f-ui); color: var(--muted); white-space: nowrap;
-  -webkit-user-select: none; user-select: none; pointer-events: none;
+::highlight(hb-hot-on) { background-color: var(--hot-bg); }
+mark.hot {
+  color: inherit; background: none; padding: 0; border-radius: 0;
+  text-decoration: underline dashed var(--hot-line); text-decoration-thickness: 1.5px; text-underline-offset: .14em;
+  text-decoration-skip-ink: none; -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
-.rx-hot::before { content: attr(data-label); }
+mark.hot.is-on { background-color: var(--hot-bg); }
+#text.hot-hover, #text mark.hot { cursor: pointer; }
+/* 键盘入口：片段开头不含文字的锚点，只在键盘聚焦时可见 */
+.rx-hk { display: inline-block; width: 0; height: 1.1em; vertical-align: -.18em; outline: none; }
+.rx-hk:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+.hot-pop {
+  position: absolute; z-index: 56; display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 12px;
+  background: var(--paper); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 2px;
+  box-shadow: 3px 3px 0 var(--hot-shadow);
+  font: 14px/1.4 var(--f-ui); text-indent: 0; text-align: left; white-space: nowrap;
+  -webkit-user-select: none; user-select: none;
+}
+.hot-pop p { margin: 0; text-indent: 0; }
+.hot-pop .hot-n b { font-family: var(--f-display); font-weight: 700; font-size: 17px; margin-right: 1px; font-variant-numeric: tabular-nums; }
+.hot-pop .hot-n:focus { outline: none; }
+.hot-pop .hot-me { color: var(--muted); font-size: 13px; padding-right: 6px; }
+.hot-pop .hot-join { min-height: 36px; padding: 2px 12px; font-size: 14px; }
+@media (pointer: coarse) { .hot-pop .hot-join { min-height: 40px; } }
+.hl-bar .hl-hotn { padding: 0 6px 0 8px; font-size: 13px; opacity: .85; font-variant-numeric: tabular-nums; }
 
 /* ---------- 段落定位高亮（#p-N）：套印粉底淡出 ---------- */
 @keyframes rx-flash { from { background-color: var(--flash); } to { background-color: transparent; } }

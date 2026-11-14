@@ -1,35 +1,17 @@
-/* 浏览量：每次打开页面上报一次（POST /api/view），并把公开计数填进页面上的占位元素。
+/* 浏览量：把公开计数填进页面上的占位元素。浏览记录与数据都来自 site.js 的 HB.hit()（POST /api/hit，
+   每次打开页面只发这一个请求；本文件不再单独请求 /api/view、/api/views）。
    占位元素：
      [data-views="total"]      全站累计浏览
      [data-views="today-pv"]   今日浏览
      [data-views="today-uv"]   今日访客
      [data-views-page="<id>"]  某页面累计浏览（作品 id、home 等）
-   /stats/ 页面另有 #views-chart 与 #views-rank，由本文件渲染。
+   /stats/ 页面另有 #views-chart 与 #views-rank，由本文件渲染（近 30 天走势随 hit 一起返回）。
    API 不可用时静默失败，占位元素保持隐藏。 */
 (function () {
   'use strict';
   var W = window, D = document;
 
-  function pageKey() {
-    var work = D.body.getAttribute('data-work');
-    if (work) return work;
-    var p = D.body.getAttribute('data-page') || '';
-    return /^[a-z0-9-]{1,40}$/.test(p) ? p : 'other';
-  }
-  function device() {
-    try { return (W.HB && W.HB.device && W.HB.device()) || localStorage.getItem('hb.device') || ''; } catch (e) { return ''; }
-  }
   function fmt(n) { return String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-
-  function report() {
-    try {
-      fetch('/api/view', {
-        method: 'POST', keepalive: true, credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page: pageKey(), device: device() })
-      }).catch(function () {});
-    } catch (e) { /* ignore */ }
-  }
 
   function fill(data) {
     var map = { total: data.total, 'today-pv': data.today && data.today.pv, 'today-uv': data.today && data.today.uv };
@@ -80,13 +62,13 @@
     }
   }
 
-  function load() {
-    fetch('/api/views', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d) fill(d); })
-      .catch(function () {});
+  function start() {
+    if (!W.HB || !W.HB.hit) return;
+    W.HB.hit().then(function (d) {
+      if (!d || !d.views) return;
+      var data = { total: d.views.total, today: d.views.today, pages: d.views.pages, series: d.series };
+      fill(data);
+    }, function () {});
   }
-
-  function start() { report(); load(); }
   if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', start); else start();
 })();

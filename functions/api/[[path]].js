@@ -1,7 +1,12 @@
 // 海豹杯 2026 获奖作品站 — Pages Functions 后端（/api/*）
-// 接口与表结构以 SPEC.md 为准；热门划线接口（/api/works/:id/marks）见下方 handleListMarks / handlePostMarks。
+// 接口与表结构以 SPEC.md 为准。
+// 片段级热门划线：GET/POST /api/works/:id/hot（handleHot*）；页面打开合并请求：POST /api/hit（handleHit）。
+// 旧的段级热门划线接口 /api/works/:id/marks（handleListMarks / handlePostMarks）保留给旧页面，新前端不再调用。
 
-import { handleView, handleViews, handleRecentComments } from '../../src/views.js';
+import {
+  handleView, handleViews, handleViewsSeries, handleRecentComments, recordView, loadParts, cacheKey,
+  summaryPart, seriesPart, recentPart, patchSeries, viewsOut,
+} from '../../src/views.js';
 
 const WORK_IDS = new Set([
   'huidao-mingtian', 'zhuan-rengong', 'yiqie-ruchang', 'shuzi-shibolie',
@@ -27,9 +32,32 @@ const MARK_P_MAX = 5000;       // 段落编号上限（最长的作品约 1200 �
 const MARK_BATCH_MAX = 30;     // 一次请求最多 30 段（跨段划线）
 const MARK_DAY_MAX = 300;      // 同一设备每天最多 300 次（按段计）
 
-// 限流规则：[key 前缀, 窗口毫秒, 上限, 超限提示]
+// 片段级热门划线：常量集中在这里，调整阈值只改这几行
+const HOT = {
+  MIN: 3,            // 至少 3 人（须与 schema.sql 部分索引 hot_cov_top 的 maxn >= 3 一致，查询里也写字面量 3）
+  RATIO: 0.02,       // 且至少为该作品有划线读者数的 2%：阈值 = max(MIN, ceil(RATIO × readers))
+  TOP: 50,           // 每部作品最多显示 n 最高的 50 个片段
+  MIN_LEN: 2,        // 短于 2 个字的片段不显示
+  TTL: 60,           // GET 边缘缓存秒数
+  POS_MAX: 5000,     // 段内字符偏移上限：0 ≤ s < e ≤ 5000
+  SEGS_MAX: 20,      // 每段最多 20 个区间
+  ITEMS_MAX: 30,     // 一次请求最多 30 段
+  RETRIES: 5,        // 乐观并发冲突时最多尝试次数（每次之间随机退避）；仍冲突则走「只写本人区间 + 重算该段」的兜底
+  HEAL_TRIES: 8,     // 重算该段时比较并交换的最多尝试次数
+  HEAL_EVERY: 10,    // maxn 跨越 10 的倍数时从 mark_ranges 重算该段（自愈）
+};
+
+// 限流（device 为客户端随机生成，可被脚本轮换，所以写接口另加宽松的 IP 软限流；大陆 CGNAT / 校园网共用出口 IP，IP 上限放宽）
 const BURST_MS = 15 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const LIMITS = {
+  COMMENT_DEV_BURST: 1,    // 同一设备 15 秒 1 条
+  COMMENT_DEV_DAY: 50,     // 同一设备每天 50 条
+  COMMENT_IP_BURST: 5,     // 同一 IP 15 秒 5 条
+  COMMENT_IP_DAY: 300,     // 同一 IP 每天 300 条
+  WRITE_IP_DAY: 2000,      // 同一 IP 每天 点赞 + 收藏 + 评论点赞 + 划线同步 合计 2000 次请求（D1 计数，每次写请求 +1 行写入）
+  HIT_IP_MIN: 120,         // 同一 IP 每分钟 120 次 /api/hit 或 /api/view（只在 isolate 内存里计数，不写 D1）
+};
 
 class HttpError extends Error {
   constructor(status, message, headers) {
@@ -39,16 +67,33 @@ class HttpError extends Error {
   }
 }
 
+// 可缓存的响应在 extra 里给 'Cache-Control': 'public, max-age=N'；这里同时写入内部头 X-HB-TTL: N，
+// 由 onRequest 出口统一改写成最终的 Cache-Control（见 finalize），不依赖 Cache API 命中时带回来的头。
 function json(data, status = 200, extra = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'X-Content-Type-Options': 'nosniff',
-      'Cache-Control': 'no-store',
-      ...extra,
-    },
-  });
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'no-store',
+    ...extra,
+  };
+  const m = /^public, max-age=(\d+)$/.exec(headers['Cache-Control']);
+  if (m) headers['X-HB-TTL'] = m[1];
+  return new Response(JSON.stringify(data), { status, headers });
+}
+
+// /api 出口统一兜底（Workers 入口 src/worker.js 与 Pages Functions 都经过 onRequest）：
+// 线上从 caches.default 命中的响应会带回 zone 的 Browser Cache TTL（max-age=14400），浏览器会把计数、评论缓存 4 小时。
+// 这里一律重建响应：有 X-HB-TTL 的设为 public, max-age=<我们的短 TTL>，其余设为 no-store；删除 Age / Expires 与内部头。
+const MAX_TTL = 300;
+function finalize(resp, head) {
+  const h = new Headers(resp.headers);
+  const ttl = Number(h.get('X-HB-TTL'));
+  h.delete('X-HB-TTL');
+  h.delete('Age');
+  h.delete('Expires');
+  h.set('Cache-Control', ttl > 0 && ttl <= MAX_TTL && resp.status === 200 ? `public, max-age=${ttl}` : 'no-store');
+  h.set('X-Content-Type-Options', 'nosniff');
+  return new Response(head ? null : resp.body, { status: resp.status, statusText: resp.statusText, headers: h });
 }
 
 function errorResponse(status, message, extra) {
@@ -163,7 +208,10 @@ async function cached(ctx, key, ttl, build) {
   if (cache) {
     try {
       const hit = await cache.match(key);
-      if (hit) return hit;
+      // 命中：只取正文，重建响应头（命中带回的 Cache-Control / Age 不可信）
+      if (hit) return new Response(hit.body, { status: 200, headers: {
+        'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${ttl}`, 'X-HB-TTL': String(ttl),
+      } });
     } catch (_) { /* 缓存不可用时直接查库 */ }
   }
   const data = await build();
@@ -221,23 +269,34 @@ const COMMENT_COUNTER_DEC_FOR_DELETE = `
 
 // ---------- 处理函数 ----------
 
+// 点赞 / 收藏 / 评论计数（counters 表 ≤ 18 × 3 行）。与 GET /api/stats 共用缓存键。
+function statsPart(url) {
+  return {
+    key: statsCacheKey(url),
+    ttl: STATS_TTL,
+    stmts: (db) => [db.prepare('SELECT work, kind, n FROM counters')],
+    build: ([rows]) => {
+      const works = {};
+      for (const id of WORK_IDS) works[id] = { likes: 0, favs: 0, comments: 0 };
+      const field = { like: 'likes', fav: 'favs', comment: 'comments' };
+      for (const r of rows) {
+        if (works[r.work] && field[r.kind]) works[r.work][field[r.kind]] = r.n;
+      }
+      return { works };
+    },
+  };
+}
+
 async function handleStats(env, ctx, url) {
-  return cached(ctx, statsCacheKey(url), STATS_TTL, async () => {
-    const works = {};
-    for (const id of WORK_IDS) works[id] = { likes: 0, favs: 0, comments: 0 };
-    const { results } = await env.DB.prepare('SELECT work, kind, n FROM counters').all();
-    const field = { like: 'likes', fav: 'favs', comment: 'comments' };
-    for (const r of results || []) {
-      if (works[r.work] && field[r.kind]) works[r.work][field[r.kind]] = r.n;
-    }
-    return { works };
-  });
+  const [data] = await loadParts(env, ctx.waitUntil, [statsPart(url)]);
+  return json(data, 200, { 'Cache-Control': `public, max-age=${STATS_TTL}` });
 }
 
 async function handleReaction(env, request, work, kind) {
   const body = await readJson(request);
   const actor = await actorFrom(env, body);
   const on = requireBool(body.on);
+  await ipWriteLimit(env, request);
   const stmts = on
     ? [
         env.DB.prepare(COUNTER_INC_IF_ABSENT).bind(work, kind, actor),
@@ -297,6 +356,28 @@ async function handleListComments(env, ctx, url, work) {
   });
 }
 
+// 写接口（点赞、收藏、评论点赞、划线）共用的 IP 日上限：1 次 ratelimit 行写入
+async function ipWriteLimit(env, request) {
+  const ip = await ipHash(env, request);
+  await hitLimits(env, [{ key: `ipw:${ip}`, window: DAY_MS, max: LIMITS.WRITE_IP_DAY,
+    message: () => '这个网络今天的操作次数过多，请明天再试' }]);
+}
+
+// /api/hit、/api/view 的 IP 每分钟上限：只在本 isolate 内存里计数（不写 D1），是软限流
+const hitWindow = new Map(); // ip -> {n, reset}
+function hitRateOk(request) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const now = Date.now();
+  if (hitWindow.size > 20000) {
+    for (const [k, v] of hitWindow) if (v.reset <= now) hitWindow.delete(k);
+    if (hitWindow.size > 20000) hitWindow.clear();
+  }
+  let e = hitWindow.get(ip);
+  if (!e || e.reset <= now) { e = { n: 0, reset: now + 60 * 1000 }; hitWindow.set(ip, e); }
+  e.n += 1;
+  return e.n <= LIMITS.HIT_IP_MIN;
+}
+
 async function hitLimits(env, keys) {
   // keys: [{key, window, max, message}]，先全部 +1，任一超限则回滚 +1 并报错
   const now = Date.now();
@@ -347,11 +428,13 @@ async function handlePostComment(env, ctx, request, url, work) {
     parent = body.parent;
   }
 
+  // IP + device 组合限流：设备严格（15 秒 1 条、每天 50 条），IP 宽松（15 秒 5 条、每天 300 条，避免误伤共用出口 IP 的读者）
   const ip = await ipHash(env, request);
   await hitLimits(env, [
-    { key: `ip15:${ip}`, window: BURST_MS, max: 1, message: (w) => `发言太快了，请 ${w} 秒后再试` },
-    { key: `ipday:${ip}`, window: DAY_MS, max: 50, message: () => '今天这个网络的发言已达上限（50 条），请明天再来' },
-    { key: `devday:${actor}`, window: DAY_MS, max: 50, message: () => '你今天的发言已达上限（50 条），请明天再来' },
+    { key: `dev15:${actor}`, window: BURST_MS, max: LIMITS.COMMENT_DEV_BURST, message: (w) => `发言太快了，请 ${w} 秒后再试` },
+    { key: `devday:${actor}`, window: DAY_MS, max: LIMITS.COMMENT_DEV_DAY, message: () => `你今天的发言已达上限（${LIMITS.COMMENT_DEV_DAY} 条），请明天再来` },
+    { key: `ip15:${ip}`, window: BURST_MS, max: LIMITS.COMMENT_IP_BURST, message: (w) => `这个网络发言太频繁了，请 ${w} 秒后再试` },
+    { key: `ipday:${ip}`, window: DAY_MS, max: LIMITS.COMMENT_IP_DAY, message: () => `今天这个网络的发言已达上限（${LIMITS.COMMENT_IP_DAY} 条），请明天再来` },
   ]);
 
   const created = Date.now();
@@ -387,6 +470,7 @@ async function handleCommentLike(env, request, cid) {
   const on = requireBool(body.on);
   const c = await findComment(env, cid);
   if (!c) throw new HttpError(404, '评论不存在或已删除');
+  await ipWriteLimit(env, request);
   // 与作品点赞相同：先按主键点查决定 ±1，再改 comment_likes，最后读回
   const stmts = on
     ? [
@@ -474,6 +558,7 @@ async function handlePostMarks(env, request, work) {
   const actor = await actorFrom(env, body);
   const on = requireBool(body.on);
   const ps = parseMarkParagraphs(body.p);
+  await ipWriteLimit(env, request);
   const now = Date.now();
   const rlKey = `markday:${actor}`;
   const RL_OK = `(SELECT n FROM ratelimit WHERE key = ?4) <= ${MARK_DAY_MAX}`;
@@ -526,6 +611,366 @@ async function handlePostMarks(env, request, work) {
   return json(Array.isArray(body.p) ? { on, items } : { on, p: items[0].p, n: items[0].n, items });
 }
 
+// ---------- 片段级热门划线 ----------
+// 区间：[s, e) 为段内纯文本字符偏移。segs = 某读者在某段的区间并集（排序、合并后的 JSON 字符串，作为比较并交换的值）。
+// cov  = 该段所有读者区间的覆盖计数，游程编码 [[s, e, n], ...]（只存 n ≥ 1 的游程，相邻同值合并）。
+
+function hotThreshold(readers) {
+  return Math.max(HOT.MIN, Math.ceil(HOT.RATIO * (readers || 0)));
+}
+
+// 校验并规范化一段的区间列表：整数、0 ≤ s < e ≤ POS_MAX、最多 SEGS_MAX 个；排序后合并重叠与相接的区间
+function normSegs(v) {
+  if (!Array.isArray(v) || v.length > HOT.SEGS_MAX) throw new HttpError(400, `每段最多 ${HOT.SEGS_MAX} 个划线区间`);
+  const list = v.map((x) => {
+    if (!Array.isArray(x) || x.length !== 2) throw new HttpError(400, '划线区间格式应为 [起点, 终点]');
+    const [a, b] = x;
+    if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || a < 0 || b > HOT.POS_MAX || a >= b) {
+      throw new HttpError(400, `划线区间无效：需要 0 ≤ 起点 < 终点 ≤ ${HOT.POS_MAX} 的整数`);
+    }
+    return [a, b];
+  }).sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  const out = [];
+  for (const [a, b] of list) {
+    const last = out[out.length - 1];
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out;
+}
+
+function parseHotItems(v) {
+  if (!Array.isArray(v) || !v.length || v.length > HOT.ITEMS_MAX) {
+    throw new HttpError(400, `参数 items 必须是 1–${HOT.ITEMS_MAX} 个段落`);
+  }
+  const seen = new Set();
+  return v.map((it) => {
+    if (!it || typeof it !== 'object') throw new HttpError(400, '参数 items 格式不正确');
+    const p = it.p;
+    if (!Number.isSafeInteger(p) || p < 1 || p > MARK_P_MAX) throw new HttpError(400, '参数 p 必须是有效的段落编号');
+    if (seen.has(p)) throw new HttpError(400, '同一段落在一次请求里只能出现一次');
+    seen.add(p);
+    const segs = normSegs(it.segs);
+    return { p, segs, str: segs.length ? JSON.stringify(segs) : null };
+  });
+}
+
+function parseJsonArray(s) {
+  if (!s) return [];
+  try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+}
+
+// 覆盖计数的差分：事件扫描。terms = [{segs:[[s,e]...], w}] 与已有 cov 的游程一起累加
+function sweep(cov, terms) {
+  const ev = new Map();
+  const add = (pos, d) => ev.set(pos, (ev.get(pos) || 0) + d);
+  for (const [a, b, n] of cov) { add(a, n); add(b, -n); }
+  for (const { segs, w } of terms) for (const [a, b] of segs) { add(a, w); add(b, -w); }
+  const pos = [...ev.keys()].sort((x, y) => x - y);
+  const out = [];
+  let cur = 0, maxn = 0;
+  for (let i = 0; i < pos.length; i++) {
+    cur += ev.get(pos[i]);
+    const next = pos[i + 1];
+    if (next === undefined) break;
+    const n = Math.max(0, cur); // 理论上不会为负；万一数据漂移就截到 0，留待自愈重算
+    if (n <= 0) continue;
+    const last = out[out.length - 1];
+    if (last && last[1] === pos[i] && last[2] === n) last[1] = next;
+    else out.push([pos[i], next, n]);
+    if (n > maxn) maxn = n;
+  }
+  return { cov: out, maxn };
+}
+
+// 覆盖计数 → 达到阈值的片段：连续（首尾相接）且 n ≥ T 的游程合并为一个片段，n 取片段内最大值
+function hotPieces(p, cov, T) {
+  const out = [];
+  let cur = null;
+  for (const [a, b, n] of cov) {
+    if (n < T) { cur = null; continue; }
+    if (cur && cur.e === a) { cur.e = b; if (n > cur.n) cur.n = n; }
+    else { cur = { p, s: a, e: b, n }; out.push(cur); }
+  }
+  return out.filter((x) => x.e - x.s >= HOT.MIN_LEN);
+}
+
+function hotCacheKey(url, work) {
+  return cacheKey(url.origin, `/api/works/${work}/hot`);
+}
+
+// 读取：有划线读者数 1 行 + 部分索引 hot_cov_top 上 maxn 最高的最多 50 段。
+// 每个达到阈值的段至少贡献一个 n = maxn 的片段，所以「n 最高的 50 个片段」一定落在 maxn 最高的 50 段里。
+function hotPart(url, work) {
+  return {
+    key: hotCacheKey(url, work),
+    ttl: HOT.TTL,
+    stmts: (db) => [
+      db.prepare('SELECT n FROM work_highlighters WHERE work = ?1').bind(work),
+      db.prepare(
+        `SELECT p, cov, maxn FROM hot_cov WHERE work = ?1 AND maxn >= 3 ORDER BY maxn DESC LIMIT ${HOT.TOP}`
+      ).bind(work),
+    ],
+    build: ([hl, rows]) => {
+      const readers = hl[0]?.n || 0;
+      const threshold = hotThreshold(readers);
+      let segs = [];
+      for (const r of rows) {
+        if (r.maxn < threshold) continue;
+        segs = segs.concat(hotPieces(r.p, parseJsonArray(r.cov), threshold));
+      }
+      segs.sort((a, b) => b.n - a.n || a.p - b.p || a.s - b.s);
+      segs = segs.slice(0, HOT.TOP).sort((a, b) => a.p - b.p || a.s - b.s);
+      return { threshold, readers, segs };
+    },
+  };
+}
+
+async function handleGetHot(env, ctx, url, work) {
+  const [data] = await loadParts(env, ctx.waitUntil, [hotPart(url, work)]);
+  return json(data, 200, { 'Cache-Control': `public, max-age=${HOT.TTL}` });
+}
+
+function randomTok() {
+  const b = new Uint8Array(9);
+  crypto.getRandomValues(b);
+  return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+// 读当前状态：本人在这些段的 segs、这些段的 cov（主键点查，O(段数)）
+function hotStateStmts(env, work, actor, ps) {
+  const list = JSON.stringify(ps);
+  return [
+    env.DB.prepare(
+      'SELECT p, segs FROM mark_ranges WHERE work = ?1 AND actor = ?2 AND p IN (SELECT value FROM json_each(?3))'
+    ).bind(work, actor, list),
+    env.DB.prepare(
+      'SELECT p, cov, maxn, tok FROM hot_cov WHERE work = ?1 AND p IN (SELECT value FROM json_each(?2))'
+    ).bind(work, list),
+  ];
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 自愈 / 兜底：从 mark_ranges 重算这一段的覆盖计数（读取该段所有读者的行，只在 maxn 跨越 10 的倍数或并发冲突兜底时发生），
+// 快照与令牌在同一个 batch（同一事务）里读取，再用令牌比较并交换写回；被别的写入抢先就重读重算。
+async function healHot(env, work, p) {
+  for (let i = 0; i < HOT.HEAL_TRIES; i++) {
+    if (i) await sleep(5 + Math.random() * 25 * i);
+    const [rows, cur] = await env.DB.batch([
+      env.DB.prepare('SELECT segs FROM mark_ranges WHERE work = ?1 AND p = ?2').bind(work, p),
+      env.DB.prepare('SELECT tok FROM hot_cov WHERE work = ?1 AND p = ?2').bind(work, p),
+    ]);
+    const tok = cur.results?.[0]?.tok;
+    const terms = (rows.results || []).map((r) => ({ segs: parseJsonArray(r.segs), w: 1 }));
+    const { cov, maxn } = sweep([], terms);
+    const res = tok === undefined
+      ? await env.DB.prepare(
+        `INSERT INTO hot_cov (work, p, cov, maxn, tok) SELECT ?1, ?2, ?3, ?4, ?5
+         WHERE NOT EXISTS (SELECT 1 FROM hot_cov WHERE work = ?1 AND p = ?2)`
+      ).bind(work, p, JSON.stringify(cov), maxn, randomTok()).run()
+      : await env.DB.prepare('UPDATE hot_cov SET cov = ?3, maxn = ?4, tok = ?5 WHERE work = ?1 AND p = ?2 AND tok = ?6')
+        .bind(work, p, JSON.stringify(cov), maxn, randomTok(), tok).run();
+    if (res.meta?.changes) return true;
+  }
+  console.error('hot heal gave up', work, p);
+  return false;
+}
+
+// POST /api/works/:id/hot  {device, items:[{p, segs:[[s,e],...]}]}  →  {ok, done:[p], failed:[p]}
+// 客户端在某段的划线集合变化时上传该段的新区间并集（空数组 = 该段已无划线）。只上传区间，不上传笔记与原文。
+// 流程（每次尝试 2 次 D1 往返）：
+//   1. 读：限流计数 +段数（与旧接口共用每设备每天 300 段次）、本人旧 segs、该段 cov 与令牌 tok；
+//   2. 在 Worker 里算差分：cov' = cov + [新区间] − [旧区间]；
+//   3. 写（同一 batch = 同一事务）：
+//      a. hot_cov 比较并交换：只有 tok 仍是读到的值、且本人 segs 仍是读到的值时才写入 cov' 与新的随机令牌 T；
+//      b. mark_ranges 写入/删除，条件是 hot_cov.tok = T（即 a 成功）——两者要么都生效、要么都不生效；
+//      c. 本人首次在该作品划线：work_highlighters +1 并登记 mark_actors（同样以 a 成功为条件，且 NOT EXISTS 防重复）；
+//      d. 读回各段 tok，判断哪些段提交成功。
+//   冲突（并发写同一段）的段重新读取后重试，最多 HOT.RETRIES 次；本人并发重复提交相同内容时，重读后发现无变化即成功。
+async function handlePostHot(env, ctx, request, work) {
+  const body = await readJson(request);
+  const actor = await actorFrom(env, body);
+  const items = parseHotItems(body.items);
+  const ip = await ipHash(env, request);
+  const now = Date.now();
+  const byP = new Map(items.map((it) => [it.p, it]));
+  const rl = (key, n) => env.DB.prepare(
+    `INSERT INTO ratelimit (key, n, reset) VALUES (?1, ?2, ?3)
+     ON CONFLICT (key) DO UPDATE SET
+       n = CASE WHEN reset <= ?4 THEN ?2 ELSE n + ?2 END,
+       reset = CASE WHEN reset <= ?4 THEN ?3 ELSE reset END
+     RETURNING n`
+  ).bind(key, n, now + DAY_MS, now);
+
+  let pending = items.map((it) => it.p);
+  const first = await env.DB.batch([
+    rl(`markday:${actor}`, items.length),
+    rl(`ipw:${ip}`, 1),
+    env.DB.prepare('SELECT 1 AS x FROM mark_actors WHERE work = ?1 AND actor = ?2').bind(work, actor),
+    ...hotStateStmts(env, work, actor, pending),
+  ]);
+  if ((first[0].results?.[0]?.n ?? 0) > MARK_DAY_MAX) {
+    throw new HttpError(429, `今天的划线同步已达上限（${MARK_DAY_MAX} 段次），本机划线照常保存，热门划线明天再同步`);
+  }
+  if ((first[1].results?.[0]?.n ?? 0) > LIMITS.WRITE_IP_DAY) {
+    throw new HttpError(429, '这个网络今天的操作次数过多，本机划线照常保存，热门划线明天再同步');
+  }
+  let known = !!first[2].results?.length;
+  let state = [first[3], first[4]];
+  const done = [];
+  const heal = [];
+
+  for (let attempt = 0; attempt < HOT.RETRIES && pending.length; attempt++) {
+    if (attempt > 0) {
+      await sleep(3 + Math.random() * 20 * attempt);   // 随机退避，错开并发写同一段的请求
+      state = await env.DB.batch(hotStateStmts(env, work, actor, pending));
+    }
+    const mine = new Map((state[0].results || []).map((r) => [r.p, r.segs]));
+    const covs = new Map((state[1].results || []).map((r) => [r.p, r]));
+    const stmts = [];
+    const tries = []; // {p, tok, before, after, adds}
+    for (const p of pending) {
+      const it = byP.get(p);
+      const oldStr = mine.has(p) ? mine.get(p) : null;
+      if (oldStr === it.str) { done.push(p); continue; } // 没有变化（或并发的另一请求已写入相同内容）
+      const row = covs.get(p);
+      const { cov, maxn } = sweep(row ? parseJsonArray(row.cov) : [], [
+        { segs: it.segs, w: 1 }, { segs: parseJsonArray(oldStr), w: -1 },
+      ]);
+      const tok = randomTok();
+      const mineIs = '(SELECT segs FROM mark_ranges WHERE work = ?1 AND p = ?2 AND actor = ?6) IS ?7';
+      if (row) {
+        stmts.push(env.DB.prepare(
+          `UPDATE hot_cov SET cov = ?3, maxn = ?4, tok = ?5 WHERE work = ?1 AND p = ?2 AND tok = ?8 AND ${mineIs}`
+        ).bind(work, p, JSON.stringify(cov), maxn, tok, actor, oldStr, row.tok));
+      } else {
+        stmts.push(env.DB.prepare(
+          `INSERT INTO hot_cov (work, p, cov, maxn, tok) SELECT ?1, ?2, ?3, ?4, ?5
+           WHERE NOT EXISTS (SELECT 1 FROM hot_cov WHERE work = ?1 AND p = ?2) AND ${mineIs}`
+        ).bind(work, p, JSON.stringify(cov), maxn, tok, actor, oldStr));
+      }
+      const committed = 'EXISTS (SELECT 1 FROM hot_cov WHERE work = ?1 AND p = ?2 AND tok = ?4)';
+      stmts.push(it.str
+        ? env.DB.prepare(
+          `INSERT INTO mark_ranges (work, p, actor, segs) SELECT ?1, ?2, ?3, ?5 WHERE ${committed}
+           ON CONFLICT (work, p, actor) DO UPDATE SET segs = excluded.segs`
+        ).bind(work, p, actor, tok, it.str)
+        : env.DB.prepare(`DELETE FROM mark_ranges WHERE work = ?1 AND p = ?2 AND actor = ?3 AND ${committed}`)
+          .bind(work, p, actor, tok));
+      tries.push({ p, tok, before: row ? row.maxn : 0, after: maxn, adds: !!it.str });
+    }
+    if (!tries.length) { pending = []; break; }
+    const addTries = tries.filter((t) => t.adds);
+    if (!known && addTries.length) {
+      const anyCommitted = `EXISTS (SELECT 1 FROM hot_cov WHERE work = ?1
+        AND p IN (SELECT value FROM json_each(?3)) AND tok IN (SELECT value FROM json_each(?4)))`;
+      const ps = JSON.stringify(addTries.map((t) => t.p)), toks = JSON.stringify(addTries.map((t) => t.tok));
+      stmts.push(
+        env.DB.prepare(
+          `INSERT INTO work_highlighters (work, n) SELECT ?1, 1
+           WHERE NOT EXISTS (SELECT 1 FROM mark_actors WHERE work = ?1 AND actor = ?2) AND ${anyCommitted}
+           ON CONFLICT (work) DO UPDATE SET n = n + 1`
+        ).bind(work, actor, ps, toks),
+        env.DB.prepare(`INSERT OR IGNORE INTO mark_actors (work, actor) SELECT ?1, ?2 WHERE ${anyCommitted}`)
+          .bind(work, actor, ps, toks),
+      );
+    }
+    stmts.push(env.DB.prepare(
+      'SELECT p, tok FROM hot_cov WHERE work = ?1 AND p IN (SELECT value FROM json_each(?2))'
+    ).bind(work, JSON.stringify(tries.map((t) => t.p))));
+    const res = await env.DB.batch(stmts);
+    const now2 = new Map((res[res.length - 1].results || []).map((r) => [r.p, r.tok]));
+    const retry = [];
+    for (const t of tries) {
+      if (now2.get(t.p) === t.tok) {
+        done.push(t.p);
+        if (t.adds) known = true;
+        const a = Math.floor(t.before / HOT.HEAL_EVERY), b = Math.floor(t.after / HOT.HEAL_EVERY);
+        if (a !== b) heal.push(t.p);
+      } else retry.push(t.p);
+    }
+    pending = retry;
+  }
+  // 兜底：多次冲突仍未提交的段（同一段被大量并发写入），只按「本人旧区间未变」写入本人区间，再从 mark_ranges 重算该段。
+  // 重算读取该段全部读者的行，但只在这种罕见情况下发生；重算完成前热门显示可能短暂偏少。
+  if (pending.length) {
+    const st = await env.DB.batch(hotStateStmts(env, work, actor, pending).slice(0, 1));
+    const mine = new Map((st[0].results || []).map((r) => [r.p, r.segs]));
+    const stmts = [];
+    for (const p of pending) {
+      const it = byP.get(p);
+      const oldStr = mine.has(p) ? mine.get(p) : null;
+      if (oldStr === it.str) continue;
+      const same = '(SELECT segs FROM mark_ranges WHERE work = ?1 AND p = ?2 AND actor = ?3) IS ?4';
+      stmts.push(it.str
+        ? env.DB.prepare(
+          `INSERT INTO mark_ranges (work, p, actor, segs) SELECT ?1, ?2, ?3, ?5 WHERE ${same}
+           ON CONFLICT (work, p, actor) DO UPDATE SET segs = excluded.segs`
+        ).bind(work, p, actor, oldStr, it.str)
+        : env.DB.prepare(`DELETE FROM mark_ranges WHERE work = ?1 AND p = ?2 AND actor = ?3 AND segs IS ?4`)
+          .bind(work, p, actor, oldStr));
+    }
+    const adds = pending.filter((p) => byP.get(p).str);
+    if (!known && adds.length) {
+      const mineNow = `EXISTS (SELECT 1 FROM mark_ranges WHERE work = ?1 AND actor = ?2 AND p IN (SELECT value FROM json_each(?3)))`;
+      stmts.push(
+        env.DB.prepare(
+          `INSERT INTO work_highlighters (work, n) SELECT ?1, 1
+           WHERE NOT EXISTS (SELECT 1 FROM mark_actors WHERE work = ?1 AND actor = ?2) AND ${mineNow}
+           ON CONFLICT (work) DO UPDATE SET n = n + 1`
+        ).bind(work, actor, JSON.stringify(adds)),
+        env.DB.prepare(`INSERT OR IGNORE INTO mark_actors (work, actor) SELECT ?1, ?2 WHERE ${mineNow}`)
+          .bind(work, actor, JSON.stringify(adds)),
+      );
+    }
+    stmts.push(hotStateStmts(env, work, actor, pending)[0]);
+    const res = await env.DB.batch(stmts);
+    const after = new Map((res[res.length - 1].results || []).map((r) => [r.p, r.segs]));
+    const left = [];
+    for (const p of pending) {
+      if ((after.has(p) ? after.get(p) : null) === byP.get(p).str) { done.push(p); heal.push(p); } else left.push(p);
+    }
+    pending = left;
+  }
+  for (const p of new Set(heal)) ctx.waitUntil(healHot(env, work, p).catch((e) => console.error('hot heal failed', e)));
+  done.sort((a, b) => a - b);
+  return json({ ok: pending.length === 0, done, failed: pending.sort((a, b) => a - b) });
+}
+
+// ---------- 页面打开合并请求 ----------
+// POST /api/hit  {page, device, work?, hot?, recent?, series?}（device 可省略：省略时只计 PV 不计 UV）
+//   → {views:{total, today:{pv,uv}, pages}, stats:{works}, hot?, recent?, series?}
+// 一次 Worker 调用：记一次浏览（内存批量写入），并返回页面需要的公开数据。各部分仍按各自的边缘缓存键缓存
+// （与 GET /api/stats、/api/works/:id/hot、/api/comments/recent、/api/views/series 共用），未命中的部分合并成一个 D1 batch。
+//   hot：作品页且 hot !== false（读者关闭「热门划线」时前端传 false）；recent：首页（或显式 recent:true）；
+//   series：/stats/ 页（或显式 series:true）。
+async function handleHit(env, ctx, request, url) {
+  const body = await readJson(request, { optional: true });
+  const page = typeof body.page === 'string' ? body.page : '';
+  const work = typeof body.work === 'string' ? body.work : (WORK_IDS.has(page) ? page : '');
+  if (work && !WORK_IDS.has(work)) throw new HttpError(404, '作品不存在');
+  // 不在白名单里的页面（如 404）不计浏览，但仍返回公开数据（页脚的全站浏览量等）
+  await recordView({ env, waitUntil: ctx.waitUntil, page, device: body.device, validPages: VIEW_PAGES });
+  const want = {
+    hot: !!work && body.hot !== false,
+    recent: body.recent === undefined ? page === 'home' : body.recent === true,
+    series: body.series === undefined ? page === 'stats' : body.series === true,
+  };
+  const names = ['summary', 'stats'];
+  const parts = [summaryPart(url.origin), statsPart(url)];
+  if (want.hot) { names.push('hot'); parts.push(hotPart(url, work)); }
+  if (want.recent) { names.push('recent'); parts.push(recentPart(url.origin)); }
+  if (want.series) { names.push('series'); parts.push(seriesPart(url.origin)); }
+  const got = await loadParts(env, ctx.waitUntil, parts);
+  const d = Object.fromEntries(names.map((n, i) => [n, got[i]]));
+  const out = { views: viewsOut(d.summary), stats: d.stats };
+  if (d.hot) out.hot = d.hot;
+  if (d.recent) out.recent = d.recent;
+  if (d.series) out.series = patchSeries(d.series.series, d.summary);
+  return json(out);
+}
+
 // ---------- 路由 ----------
 
 function methodNotAllowed(allow) {
@@ -549,12 +994,22 @@ async function route(context) {
   const vctx = { request, env, waitUntil: (pr) => ctx.waitUntil(pr), json, errorResponse };
   if (parts.length === 1 && parts[0] === 'view') {
     if (method !== 'POST') return methodNotAllowed('POST');
+    if (!hitRateOk(request)) throw new HttpError(429, '请求太频繁，请稍后再试', { 'Retry-After': '60' });
     const body = await readJson(request, { optional: true });
     return handleView({ ...vctx, body, validPages: VIEW_PAGES });
+  }
+  if (parts.length === 1 && parts[0] === 'hit') {
+    if (method !== 'POST') return methodNotAllowed('POST');
+    if (!hitRateOk(request)) throw new HttpError(429, '请求太频繁，请稍后再试', { 'Retry-After': '60' });
+    return handleHit(env, ctx, request, url);
   }
   if (parts.length === 1 && parts[0] === 'views') {
     if (method !== 'GET') return methodNotAllowed('GET');
     return handleViews(vctx);
+  }
+  if (parts.length === 2 && parts[0] === 'views' && parts[1] === 'series') {
+    if (method !== 'GET') return methodNotAllowed('GET');
+    return handleViewsSeries(vctx);
   }
   if (parts.length === 2 && parts[0] === 'comments' && parts[1] === 'recent') {
     if (method !== 'GET') return methodNotAllowed('GET');
@@ -567,14 +1022,19 @@ async function route(context) {
     return handleStats(env, ctx, url);
   }
 
-  // /api/works/:id/(like|fav|comments|marks)
+  // /api/works/:id/(like|fav|comments|marks|hot)
   if (parts[0] === 'works' && parts.length === 3) {
     const [, work, action] = parts;
-    if (!['like', 'fav', 'comments', 'marks'].includes(action)) throw new HttpError(404, '接口不存在');
+    if (!['like', 'fav', 'comments', 'marks', 'hot'].includes(action)) throw new HttpError(404, '接口不存在');
     if (!WORK_IDS.has(work)) throw new HttpError(404, '作品不存在');
     if (action === 'like' || action === 'fav') {
       if (method !== 'POST') return methodNotAllowed('POST');
       return handleReaction(env, request, work, action);
+    }
+    if (action === 'hot') {
+      if (method === 'GET') return handleGetHot(env, ctx, url, work);
+      if (method === 'POST') return handlePostHot(env, ctx, request, work);
+      return methodNotAllowed('GET, POST');
     }
     if (action === 'marks') {
       if (method === 'GET') return handleListMarks(env, ctx, url, work);
@@ -606,10 +1066,10 @@ export async function onRequest(context) {
   try {
     const resp = await route(context);
     // HEAD 按 GET 处理，但不返回正文
-    return context.request.method.toUpperCase() === 'HEAD' ? new Response(null, resp) : resp;
+    return finalize(resp, context.request.method.toUpperCase() === 'HEAD');
   } catch (err) {
-    if (err instanceof HttpError) return errorResponse(err.status, err.message, err.headers);
+    if (err instanceof HttpError) return finalize(errorResponse(err.status, err.message, err.headers));
     console.error('api error', err && err.stack ? err.stack : err);
-    return errorResponse(500, '服务器出错了，请稍后再试');
+    return finalize(errorResponse(500, '服务器出错了，请稍后再试'));
   }
 }

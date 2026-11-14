@@ -2,7 +2,12 @@
    原生 JS，无依赖；在 site.js 之后执行，使用 window.HB。划线与笔记只存在本机 localStorage：
      hb.marks.<作品id> = [{id, p, s, e, c, note, t, x}]
      p 段落编号（正文 <p id="p-N">），s/e 段内纯文本（textContent）字符偏移，c 颜色，t 创建时间，
-     x 划线原文（供「我的笔记」页展示，那一页没有正文）。跨段选区拆成多条。 */
+     x 划线原文（供「我的笔记」页展示，那一页没有正文）。跨段选区拆成多条。
+   热门划线（公开、匿名）：某段的划线集合变化时，只把该段的区间并集 [[s,e],...] 上传到 POST /api/works/<id>/hot
+   （不上传笔记、原文与颜色）。待上传的段落编号存 hb.hotq.<id>（失败时下次打开再传）；
+   hb.hotv.<id> 标记这部作品的已有划线已经整体同步过一次（旧版本只同步过段落级计数）。
+   服务器聚合出的热门片段随 HB.hit() 一起返回，显示为虚线下划线（优先用 CSS Custom Highlight API，不改 DOM；
+   不支持时退回 <mark class="hot"> 包裹），轻点 / 悬停 / 键盘聚焦显示「N 人划线」气泡。 */
 (function () {
   'use strict';
   var D = document, W = window, HB = W.HB;
@@ -94,30 +99,56 @@
     }
 
     /* ---------- 渲染：每段先拆掉旧的 <mark>，再按偏移重新包裹 ---------- */
-    function unwrap(p) {
-      Array.prototype.slice.call(p.querySelectorAll('mark.hl')).forEach(function (m) {
+    function unwrapSel(p, sel) {
+      Array.prototype.slice.call(p.querySelectorAll(sel)).forEach(function (m) {
         while (m.firstChild) m.parentNode.insertBefore(m.firstChild, m);
         m.parentNode.removeChild(m);
       });
+    }
+    function unwrap(p) {
+      unwrapHot(p, true);
+      unwrapSel(p, 'mark.hl');
       Array.prototype.slice.call(p.querySelectorAll('.rx-note')).forEach(function (b) { b.parentNode.removeChild(b); });
       p.normalize();
     }
-    function wrap(p, m) {
-      var nodes = textNodes(p), sum = 0, first = null;
+    /* 按段内偏移 [s, e) 建 Range（跳过 data-rx 的界面元素） */
+    function rangeOf(p, s, e) {
+      var nodes = textNodes(p), sum = 0, r = D.createRange(), started = false;
+      for (var i = 0; i < nodes.length; i++) {
+        var tn = nodes[i], ns = sum, ne = sum + tn.length;
+        sum = ne;
+        if (!started && s < ne) { r.setStart(tn, Math.max(0, s - ns)); started = true; }
+        if (started && e <= ne) { r.setEnd(tn, e - ns); return r; }
+      }
+      if (!started) return null;
+      var last = nodes[nodes.length - 1];
+      r.setEnd(last, last.length);
+      return r;
+    }
+    /* 把 [s, e) 范围内的文本节点逐个包进 tag 元素（make 设置属性），返回包裹元素列表 */
+    function wrapRange(p, s, e, make) {
+      var nodes = textNodes(p), sum = 0, out = [];
       for (var i = 0; i < nodes.length; i++) {
         var tn = nodes[i], len = tn.length, ns = sum, ne = sum + len;
         sum = ne;
-        if (ne <= m.s || ns >= m.e) continue;
-        var a = Math.max(m.s, ns) - ns, b = Math.min(m.e, ne) - ns;
+        if (ne <= s || ns >= e) continue;
+        var a = Math.max(s, ns) - ns, b = Math.min(e, ne) - ns;
         if (b < len) tn.splitText(b);
         var target = a > 0 ? tn.splitText(a) : tn;
+        var mk = make();
+        target.parentNode.insertBefore(mk, target);
+        mk.appendChild(target);
+        out.push(mk);
+      }
+      return out;
+    }
+    function wrap(p, m) {
+      var first = wrapRange(p, m.s, m.e, function () {
         var mk = D.createElement('mark');
         mk.className = 'hl hl-' + (COLORS.indexOf(m.c) >= 0 ? m.c : 'yellow');
         mk.setAttribute('data-mid', m.id);
-        target.parentNode.insertBefore(mk, target);
-        mk.appendChild(target);
-        if (!first) first = mk;
-      }
+        return mk;
+      })[0];
       if (first) {
         first.tabIndex = 0;
         first.setAttribute('role', 'button');
@@ -129,7 +160,6 @@
       var p = para(n);
       if (!p) return;
       unwrap(p);
-      var hot = p.querySelector('.rx-hot');
       marks.filter(function (m) { return m.p === n; }).sort(function (a, b) { return a.s - b.s; }).forEach(function (m) {
         wrap(p, m);
         if (m.note) {
@@ -137,9 +167,10 @@
           nb.setAttribute('data-rx', '');
           nb.setAttribute('data-mid', m.id);
           nb.innerHTML = NOTE_SVG;
-          p.insertBefore(nb, hot);
+          p.appendChild(nb);
         }
       });
+      paintHotPara(n);  // 本人划线之后再叠加热门划线（热门包裹总在最内层，不影响本人划线的元素与偏移）
     }
     function renderAll() {
       var seen = {};
@@ -149,25 +180,80 @@
     marks = marks.filter(function (m) { var p = para(m.p); return p && m.e <= ptext(p).length; });
     renderAll();
 
-    /* ---------- 热门划线计数同步：某段第一次有划线 on=true，删光 on=false ---------- */
-    function parasWithMarks() { var s = {}; marks.forEach(function (m) { s[m.p] = 1; }); return s; }
-    function syncCounts(before) {
-      var after = parasWithMarks(), on = [], off = [];
-      Object.keys(after).forEach(function (k) { if (!before[k]) on.push(+k); });
-      Object.keys(before).forEach(function (k) { if (!after[k]) off.push(+k); });
-      var send = function (list, v) {
-        for (var i = 0; i < list.length; i += MAX_PARAS) {
-          HB.api('POST', '/api/works/' + encodeURIComponent(wid) + '/marks', { p: list.slice(i, i + MAX_PARAS), on: v })
-            .catch(function () { /* 只影响公开计数，本机划线不受影响 */ });
-        }
-      };
-      if (on.length) send(on, true);
-      if (off.length) send(off, false);
+    /* ---------- 热门划线同步：某段的划线区间并集变化时，上传该段的新并集（只有区间，没有笔记与原文） ---------- */
+    var HOT_POS_MAX = 5000, HOT_SEGS_MAX = 20, HOT_P_MAX = 5000, HOT_BODY_MAX = 6000;
+    var QKEY = 'hb.hotq.' + wid, VKEY = 'hb.hotv.' + wid;
+    function unionOf(n) {
+      var list = marks.filter(function (m) { return m.p === n; })
+        .map(function (m) { return [m.s, Math.min(m.e, HOT_POS_MAX)]; })
+        .filter(function (x) { return x[0] < x[1]; })
+        .sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+      var out = [];
+      list.forEach(function (x) {
+        var last = out[out.length - 1];
+        if (last && x[0] <= last[1]) last[1] = Math.max(last[1], x[1]); else out.push([x[0], x[1]]);
+      });
+      return out.slice(0, HOT_SEGS_MAX);
     }
+    function loadQ() {
+      var q = HB.jget(QKEY, []);
+      return Array.isArray(q) ? q.filter(function (x) { return x === Math.floor(x) && x >= 1 && x <= HOT_P_MAX; }) : [];
+    }
+    var syncBusy = false, syncTimer = null, syncStop = false;
+    function queueSync(ps) {
+      var q = loadQ();
+      ps.forEach(function (n) { if (n >= 1 && n <= HOT_P_MAX && q.indexOf(n) < 0) q.push(n); });
+      HB.jset(QKEY, q);
+      scheduleSync(800);
+    }
+    function scheduleSync(ms) { clearTimeout(syncTimer); syncTimer = setTimeout(flushSync, ms); }
+    function flushSync() {
+      if (syncStop) return;
+      if (syncBusy) { scheduleSync(800); return; }
+      var q = loadQ();
+      if (!q.length) return;
+      var items = [], sent = {}, size = 0;
+      for (var i = 0; i < q.length && items.length < MAX_PARAS; i++) {
+        var segs = unionOf(q[i]), js = JSON.stringify(segs);
+        if (items.length && size + js.length + 16 > HOT_BODY_MAX) break;   // 请求体上限 8KB
+        size += js.length + 16;
+        items.push({ p: q[i], segs: segs });
+        sent[q[i]] = js;
+      }
+      syncBusy = true;
+      HB.api('POST', '/api/works/' + encodeURIComponent(wid) + '/hot', { items: items }).then(function (d) {
+        syncBusy = false;
+        var done = (d && Array.isArray(d.done)) ? d.done : [], failed = (d && Array.isArray(d.failed)) ? d.failed : [];
+        // 已提交、且发出后没有再改动的段落出队
+        var q2 = loadQ().filter(function (n) { return !(done.indexOf(n) >= 0 && JSON.stringify(unionOf(n)) === sent[n]); });
+        HB.jset(QKEY, q2);
+        // 还有没发过的段（超过一次的上限，或期间又有改动）就继续；只剩并发冲突失败的段时，下次打开再试
+        if (q2.some(function (n) { return failed.indexOf(n) < 0; })) scheduleSync(300);
+      }, function (e) {
+        syncBusy = false;
+        if (e.status === 400) {
+          // 不应发生（区间已在本机规范化）；丢掉这一批，免得队列卡住
+          HB.jset(QKEY, loadQ().filter(function (n) { return !(n in sent); }));
+        } else syncStop = true;   // 429 限流 / 离线：只影响公开热门划线，下次打开作品页再同步
+      });
+    }
+    // 迁移：已有划线（旧版本只同步过段落级计数）在第一次打开新版作品页时整体同步一次
+    if (!HB.jget(VKEY, 0)) {
+      var had = {};
+      marks.forEach(function (m) { had[m.p] = 1; });
+      var all = Object.keys(had).map(Number);
+      if (all.length) {
+        var q0 = loadQ();
+        all.forEach(function (n) { if (q0.indexOf(n) < 0) q0.push(n); });
+        HB.jset(QKEY, q0);
+      }
+      HB.jset(VKEY, 1);
+    }
+    if (loadQ().length) scheduleSync(3000);   // 晚于页面打开时的 /api/hit
 
     /* ---------- 增删改 ---------- */
     function addMarks(pieces, color) {
-      var before = parasWithMarks(), ids = [];
+      var ids = [];
       pieces.forEach(function (pc) {
         var p = para(pc.p), s = pc.s, e = pc.e, notes = [], keep = null;
         marks = marks.filter(function (m) {
@@ -184,18 +270,17 @@
       });
       save();
       pieces.forEach(function (pc) { renderPara(pc.p); });
-      syncCounts(before);
+      queueSync(pieces.map(function (pc) { return pc.p; }));
       HB.jset('hb.hlc', color);
       return ids;
     }
     function removeMark(id) {
       var m = byId(id);
       if (!m) return;
-      var before = parasWithMarks();
       marks = marks.filter(function (x) { return x.id !== id; });
       save();
       renderPara(m.p);
-      syncCounts(before);
+      queueSync([m.p]);
     }
     function setColor(id, c) {
       var m = byId(id);
@@ -373,6 +458,13 @@
       state = { mode: 'edit', id: id };
       bar.innerHTML = '';
       bar.setAttribute('aria-label', '编辑划线');
+      var hn = 0;
+      if (hotOn) (hotBy[m.p] || []).forEach(function (h) { if (h.s < m.e && h.e > m.s && h.n > hn) hn = h.n; });
+      if (hn) {
+        var hl = el('span', 'hl-hotn', hn + ' 人划线');
+        bar.appendChild(hl);
+        bar.appendChild(sep());
+      }
       COLORS.forEach(function (c) {
         var s = swatch(c, '改为' + COLOR_LABEL[c], m.c === c);
         s.addEventListener('click', function () { setColor(id, c); showEditBar(id, true); });
@@ -511,11 +603,12 @@
         return;
       }
       var r = sel.getRangeAt(0), ca = r.commonAncestorContainer;
-      if (bar.contains(ca) || pop.contains(ca)) return;
+      if (bar.contains(ca) || pop.contains(ca) || hp.contains(ca)) return;
       if (!text.contains(ca)) { if (state && state.mode === 'new') hideBar(); return; }
       var pieces = piecesFromRange(r);
       if (!pieces.length) { if (state && state.mode === 'new') hideBar(); return; }
       if (!pop.hidden) closePop(false);
+      closeHot(false);
       showNewBar(pieces, rectsOf([r]));
       live.textContent = '已选中文字，按 Tab 打开划线工具条';
     }
@@ -541,72 +634,305 @@
       var t = ev.target;
       var nb = t.closest && t.closest('.rx-note[data-mid]');
       if (nb) { ev.preventDefault(); hideBar(); openBubble(nb.getAttribute('data-mid')); return; }
+      if (hp.contains(t)) return;
       var mk = t.closest && t.closest('mark.hl[data-mid]');
+      var sel = W.getSelection();
+      if (sel && !sel.isCollapsed) return;   // 正在选择文字
       if (mk) {
-        var sel = W.getSelection();
-        if (sel && !sel.isCollapsed) return;   // 正在选择文字
         closePop(false);
+        closeHot(false);
         showEditBar(mk.getAttribute('data-mid'), ev.detail === 0);
+        return;
       }
+      var hk = t.closest && t.closest('.rx-hk');
+      var h = hk ? segByKey(hk.getAttribute('data-hk')) : hotAtPoint(t, ev.clientX, ev.clientY);
+      if (h) {
+        if (hpSeg === h && hpMode !== 'hover') { closeHot(false); return; }
+        hideBar();
+        closePop(false);
+        showHot(h, ev.detail === 0 ? 'key' : 'tap');
+      } else if (hpMode && hpMode !== 'hover') closeHot(false);
     });
     text.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      // 热门锚点可能位于本人划线 <mark> 内部：先判断锚点
+      var hk = ev.target.classList && ev.target.classList.contains('rx-hk') ? ev.target : null;
+      if (hk) {
+        var h = segByKey(hk.getAttribute('data-hk'));
+        if (h) { ev.preventDefault(); hideBar(); showHot(h, 'key'); }
+        return;
+      }
       var mk = ev.target.closest && ev.target.closest('mark.hl[data-mid]');
-      if (mk && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); showEditBar(mk.getAttribute('data-mid'), true); }
+      if (mk) { ev.preventDefault(); closeHot(false); showEditBar(mk.getAttribute('data-mid'), true); }
     });
     D.addEventListener('click', function (ev) {
       var t = ev.target;
       if (!bar.hidden && state && state.mode === 'edit' && !bar.contains(t) && !(t.closest && t.closest('mark.hl'))) hideBar();
       if (!pop.hidden && !pop.contains(t) && !bar.contains(t) && !(t.closest && t.closest('.rx-note, mark.hl'))) closePop(false);
+      if (!hp.hidden && !hp.contains(t) && !text.contains(t)) closeHot(false);
     });
     D.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && !bar.hidden) { hideBar(true); if (state === null) clearSel(); }
+      else if (ev.key === 'Escape' && !hp.hidden) { closeHot(hpMode === 'focus' || hpMode === 'key'); }
     });
-    W.addEventListener('resize', function () { if (state && state.mode === 'new') hideBar(); });
+    W.addEventListener('resize', function () { if (state && state.mode === 'new') hideBar(); closeHot(false); });
 
-    /* ---------- 热门划线：读到正文后再请求（不在首屏抢流量），可在阅读设置里关闭 ---------- */
-    var hot = null, hotAsked = false, hotOn = HB.prefs().hot;
-    function renderHot() {
-      // 行尾小字可能让段落多出一行：以视口顶部所在段落为锚点保持阅读位置
-      if (HB.keepPosition) HB.keepPosition(paintHot); else paintHot();
+    /* ---------- 热门划线：片段级虚线下划线 + 「N 人划线」气泡；可在阅读设置里关闭 ---------- */
+    var hotOn = HB.prefs().hot, hotAsked = false;
+    var hotBy = {};          // 段落编号 → [{p, s, e, n, k, range, mine}]
+    var hotList = [];
+    var useHL = !!(W.CSS && CSS.highlights && typeof W.Highlight === 'function');
+    var hlMain = null, hlOn = null;
+    if (useHL) {
+      try {
+        hlMain = new Highlight(); hlOn = new Highlight();
+        CSS.highlights.set('hb-hot', hlMain);
+        CSS.highlights.set('hb-hot-on', hlOn);
+      } catch (e) { useHL = false; }
     }
-    function paintHot() {
-      Array.prototype.slice.call(text.querySelectorAll('.rx-hot')).forEach(function (x) { x.parentNode.removeChild(x); });
-      Array.prototype.slice.call(text.querySelectorAll('[data-hot]')).forEach(function (x) { x.removeAttribute('data-hot'); });
-      if (!hotOn || !hot) return;
-      hot.forEach(function (h) {
-        var p = para(h.p);
-        if (!p || !(h.n >= 2)) return;
-        p.setAttribute('data-hot', h.n >= 20 ? '3' : h.n >= 5 ? '2' : '1');
-        var s = el('span', 'rx-hot');
-        s.setAttribute('data-rx', '');
-        s.setAttribute('data-label', h.n + ' 人划线');
-        p.appendChild(s);
+    var hp = el('div', 'hot-pop');
+    hp.setAttribute('role', 'dialog');
+    hp.setAttribute('aria-label', '热门划线');
+    hp.hidden = true;
+    var hpSeg = null, hpMode = null, hoverTimer = null, hideTimer = null;
+
+    function unwrapHot(p, keepDom) {
+      if (!hotBy) return;   // 初次渲染本人划线时热门数据还没准备好
+      var n = pnum(p);
+      (hotBy[n] || []).forEach(function (h) {
+        if (h.range && hlMain) { hlMain.delete(h.range); if (hlOn) hlOn.delete(h.range); }
+        h.range = null;
+      });
+      Array.prototype.slice.call(p.querySelectorAll('.rx-hk')).forEach(function (a) { a.parentNode.removeChild(a); });
+      unwrapSel(p, 'mark.hot');
+      if (!keepDom) p.normalize();
+    }
+    function coveredByMine(h) {
+      var u = unionOf(h.p);
+      for (var i = 0; i < u.length; i++) if (u[i][0] <= h.s && u[i][1] >= h.e) return true;
+      return false;
+    }
+    function overlapsMine(h) {
+      return marks.some(function (m) { return m.p === h.p && m.s < h.e && m.e > h.s; });
+    }
+    function hotLabel(h) { return h.n + ' 人划线'; }
+    function paintHotPara(n) {
+      if (!hotBy) return;
+      var p = para(n), list = hotOn ? hotBy[n] : null;
+      if (!p || !list || !list.length) return;
+      var txt = ptext(p);
+      list.forEach(function (h) {
+        if (h.e > txt.length) return;   // 正文改过，偏移失效
+        if (!useHL) {
+          wrapRange(p, h.s, h.e, function () {
+            var mk = D.createElement('mark');
+            mk.className = 'hot';
+            mk.setAttribute('data-hk', h.k);
+            mk.setAttribute('data-n', String(h.n));
+            return mk;
+          });
+        }
+        // 键盘入口：片段开头一个不含文字的可聚焦锚点（data-rx：不计入偏移、不影响复制）
+        var r0 = rangeOf(p, h.s, h.s + 1);
+        if (r0) {
+          var a = D.createElement('span');
+          a.className = 'rx-hk';
+          a.setAttribute('data-rx', '');
+          a.setAttribute('data-hk', h.k);
+          a.tabIndex = 0;
+          a.setAttribute('role', 'button');
+          a.setAttribute('aria-label', hotLabel(h) + '：' + txt.slice(h.s, Math.min(h.e, h.s + 30)) + (h.e - h.s > 30 ? '…' : '') + '。按 Enter 查看');
+          r0.insertNode(a);
+        }
+      });
+      // DOM 改完之后再建 Range（Range 会随之后的 DOM 变化自动调整，但这里一次建好最稳妥）
+      list.forEach(function (h) {
+        if (h.e > txt.length) return;
+        h.range = rangeOf(p, h.s, h.e);
+        if (h.range && hlMain) hlMain.add(h.range);
       });
     }
+    function setHot(data) {
+      var segs = data && Array.isArray(data.segs) ? data.segs : [];
+      var old = Object.keys(hotBy).map(Number);
+      closeHot(false);
+      if (hlMain) hlMain.clear();
+      hotBy = {}; hotList = [];
+      segs.forEach(function (x, i) {
+        if (!(x && x.p >= 1 && x.s >= 0 && x.e > x.s && x.n >= 1)) return;
+        var h = { p: x.p, s: x.s, e: x.e, n: x.n, k: 'h' + i, range: null };
+        (hotBy[h.p] = hotBy[h.p] || []).push(h);
+        hotList.push(h);
+      });
+      repaintHot(old);
+    }
+    function repaintHot(extra) {
+      closeHot(false);
+      var seen = {};
+      Object.keys(hotBy).map(Number).concat(extra || []).forEach(function (n) {
+        if (seen[n]) return;
+        seen[n] = 1;
+        var p = para(n);
+        if (!p) return;
+        unwrapHot(p);
+        paintHotPara(n);
+      });
+    }
+    function segByKey(k) { for (var i = 0; i < hotList.length; i++) if (hotList[i].k === k) return hotList[i]; return null; }
+    function segRects(h) {
+      if (!h.range) return [];
+      var cr = h.range.getClientRects(), out = [];
+      for (var i = 0; i < cr.length; i++) if (cr[i].width > 0 && cr[i].height > 0) out.push(cr[i]);
+      return out;
+    }
+    function hotAtPoint(t, x, y) {
+      if (!hotOn || !hotList.length || !t || !t.closest) return null;
+      var p = t.closest('p[id^="p-"], li[id^="p-"]');
+      if (!p || !text.contains(p)) return null;
+      var list = hotBy[pnum(p)] || [];
+      for (var i = 0; i < list.length; i++) {
+        var rs = segRects(list[i]);
+        for (var j = 0; j < rs.length; j++) {
+          var r = rs[j];
+          if (x >= r.left - 1 && x <= r.right + 1 && y >= r.top - 3 && y <= r.bottom + 3) return list[i];
+        }
+      }
+      return null;
+    }
+    function setActive(h) {
+      if (hlOn) hlOn.clear();
+      Array.prototype.slice.call(text.querySelectorAll('mark.hot.is-on')).forEach(function (x) { x.classList.remove('is-on'); });
+      if (!h) return;
+      if (hlOn && h.range) hlOn.add(h.range);
+      else Array.prototype.slice.call(text.querySelectorAll('mark.hot[data-hk="' + h.k + '"]')).forEach(function (x) { x.classList.add('is-on'); });
+    }
+    function anchorOf(h) { return text.querySelector('.rx-hk[data-hk="' + h.k + '"]'); }
+    function showHot(h, mode) {
+      clearTimeout(hideTimer); clearTimeout(hoverTimer);
+      hpSeg = h; hpMode = mode;
+      hp.innerHTML = '';
+      var line = el('p', 'hot-n');
+      line.tabIndex = -1;
+      line.appendChild(el('b', null, String(h.n)));
+      line.appendChild(D.createTextNode(' 人划线'));
+      hp.appendChild(line);
+      var join = null;
+      if (h.mine || coveredByMine(h)) {
+        hp.appendChild(el('p', 'hot-me', h.mine ? '你也划了这里' : '你划过这里'));
+      } else {
+        join = btn('btn hot-join', '我也划线');
+        join.addEventListener('click', function () { joinHot(h); });
+        hp.appendChild(join);
+      }
+      setActive(h);
+      mountAfter(hp, para(h.p));
+      hp.hidden = false;
+      placeNear(hp, segRects(h), 10);
+      if (mode === 'key') (join || hp.querySelector('.hot-n')).focus({ preventScroll: true });
+    }
+    function closeHot(restoreFocus) {
+      clearTimeout(hideTimer); clearTimeout(hoverTimer);
+      if (hp.hidden) return;
+      var h = hpSeg;
+      hp.hidden = true;
+      hpSeg = null; hpMode = null;
+      setActive(null);
+      if (restoreFocus && h) { var a = anchorOf(h); if (a) a.focus({ preventScroll: true }); }
+    }
+    function joinHot(h) {
+      var had = overlapsMine(h);
+      closeHot(false);
+      addMarks([{ p: h.p, s: h.s, e: h.e }], defColor());
+      if (!had) h.n += 1;   // 本机先加上自己（服务器计数约 1 分钟后更新）
+      h.mine = true;
+      HB.toast('已划线，可在「我的笔记」里查看');
+      live.textContent = '已划线';
+      var a = anchorOf(h);
+      if (a) {
+        a.setAttribute('aria-label', hotLabel(h) + '，你也划了这里');
+        a.focus({ preventScroll: true });
+      }
+    }
+    // 热门数据：随页面打开时的 HB.hit() 一起返回；读者打开开关时若当初没取，再单独请求一次
     function askHot() {
       if (hotAsked || !hotOn) return;
       hotAsked = true;
-      HB.api('GET', '/api/works/' + encodeURIComponent(wid) + '/marks').then(function (d) {
-        hot = (d && Array.isArray(d.top)) ? d.top : [];
-        renderHot();
-      }, function () { hotAsked = false; });
+      HB.api('GET', '/api/works/' + encodeURIComponent(wid) + '/hot').then(setHot, function () { hotAsked = false; });
     }
-    if (W.IntersectionObserver) {
-      var hotTimer = null;
-      var io = new IntersectionObserver(function (en) {
-        if (en.some(function (x) { return x.isIntersecting; })) {
-          clearTimeout(hotTimer);
-          hotTimer = setTimeout(function () { io.disconnect(); askHot(); }, 1200);
-        } else clearTimeout(hotTimer);
-      });
-      io.observe(text);
-    } else setTimeout(askHot, 2000);
+    if (hotOn && HB.hit) {
+      hotAsked = true;
+      HB.hit().then(function (d) { if (d && d.hot) setHot(d.hot); else hotAsked = false; }, function () { hotAsked = false; });
+    }
     D.addEventListener('hb:prefs', function (ev) {
       var on = !!(ev.detail && ev.detail.hot);
       if (on === hotOn) return;
       hotOn = on;
-      if (on && !hot) askHot(); else renderHot();
+      if (on && !hotList.length) askHot();
+      repaintHot();
     });
+
+    /* 气泡交互：轻点 / 悬停（有鼠标的设备）/ 键盘聚焦锚点 */
+    hp.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeHot(true); }
+    });
+    hp.addEventListener('mouseenter', function () { clearTimeout(hideTimer); });
+    hp.addEventListener('mouseleave', function () { if (hpMode === 'hover') hideTimer = setTimeout(function () { closeHot(false); }, 300); });
+    hp.addEventListener('focusout', function (ev) {
+      var to = ev.relatedTarget;
+      if (to && (hp.contains(to) || (to.classList && to.classList.contains('rx-hk')))) return;
+      if (hpMode === 'key' || hpMode === 'focus') closeHot(false);
+    });
+    text.addEventListener('focusin', function (ev) {
+      var a = ev.target;
+      if (!a.classList || !a.classList.contains('rx-hk')) return;
+      var h = segByKey(a.getAttribute('data-hk'));
+      var kb = true;
+      try { kb = a.matches(':focus-visible'); } catch (e) { /* 旧浏览器：按键盘聚焦处理 */ }
+      if (h && kb) { hideBar(); closePop(false); showHot(h, 'focus'); }
+    });
+    text.addEventListener('focusout', function (ev) {
+      var a = ev.target;
+      if (!a.classList || !a.classList.contains('rx-hk')) return;
+      var to = ev.relatedTarget;
+      if (to && hp.contains(to)) return;
+      if (hpMode === 'focus') closeHot(false);
+    });
+    var hoverable = W.matchMedia && W.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (hoverable) {
+      var mvRaf = 0, mvEv = null, hoverSeg = null;
+      text.addEventListener('mousemove', function (ev) {
+        mvEv = ev;
+        if (mvRaf) return;
+        mvRaf = W.requestAnimationFrame(function () {
+          mvRaf = 0;
+          var e2 = mvEv;
+          if (pointerDown || hp.contains(e2.target) || bar.contains(e2.target)) return;
+          var h = hotAtPoint(e2.target, e2.clientX, e2.clientY);
+          text.classList.toggle('hot-hover', !!h);
+          if (h === hoverSeg) return;
+          hoverSeg = h;
+          clearTimeout(hoverTimer);
+          if (h) {
+            clearTimeout(hideTimer);
+            if (hpMode && hpMode !== 'hover') return;   // 轻点或键盘打开的气泡不被悬停替换
+            hoverTimer = setTimeout(function () {
+              var sel = W.getSelection();
+              if (sel && !sel.isCollapsed) return;
+              if (!bar.hidden || !pop.hidden) return;
+              showHot(h, 'hover');
+            }, 350);
+          } else if (hpMode === 'hover') {
+            hideTimer = setTimeout(function () { closeHot(false); }, 300);
+          }
+        });
+      });
+      text.addEventListener('mouseleave', function () {
+        hoverSeg = null;
+        clearTimeout(hoverTimer);
+        text.classList.remove('hot-hover');
+        if (hpMode === 'hover') hideTimer = setTimeout(function () { closeHot(false); }, 300);
+      });
+    }
 
     /* ---------- #p-N：滚动到该段并短暂高亮 ---------- */
     function flashHash() {

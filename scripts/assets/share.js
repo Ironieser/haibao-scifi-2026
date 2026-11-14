@@ -1,5 +1,5 @@
 /* 海豹杯 2026 — 分享面板与分享图。原生 JS，无第三方依赖。
-   用到 window.HB（site.js）与 window.qrcode（vendor/qrcode.js，在本文件之后加载，所以只在调用时再取）。
+   用到 window.HB（site.js）与 window.qrcode（vendor/qrcode.js：不随页面加载，打开分享面板时按 work-meta 的 qr 地址动态插入）。
    对外：window.HBShare.open({ text?: 选中的引文, pid?: 段落编号 })
    调试：地址加 ?wx=1 按微信内置浏览器处理。 */
 (function () {
@@ -96,6 +96,21 @@
   }
 
   /* ---------- 二维码 ---------- */
+  var qrP = null;
+  function loadQr() {
+    if (typeof W.qrcode === 'function') return Promise.resolve(true);
+    if (qrP) return qrP;
+    qrP = new Promise(function (ok) {
+      if (!meta.qr) { ok(false); return; }
+      var s = D.createElement('script');
+      s.src = meta.qr;
+      s.async = true;
+      s.onload = function () { ok(typeof W.qrcode === 'function'); };
+      s.onerror = function () { qrP = null; ok(false); };   // 失败后下次打开再试
+      D.head.appendChild(s);
+    });
+    return qrP;
+  }
   function qrMake(text) {
     var f = W.qrcode;
     if (typeof f !== 'function') return null;
@@ -309,6 +324,7 @@
     };
     fill();
     showMain(false);
+    loadQr();   // 预取：点「微信」或「分享图」时通常已就绪
     if (ui.root.hidden) {
       opener = D.activeElement && D.activeElement !== D.body ? D.activeElement : D.getElementById('act-share');
       ui.root.hidden = false;
@@ -332,10 +348,22 @@
   function showQr() {
     showSub('wx', '分享到微信');
     var wrap = el('div', 'sh-qr');
-    var svg = qrSvg(state.url, '本页链接的二维码');
     var fig = el('div', 'sh-qr-img');
-    if (svg) fig.appendChild(svg);
-    else fig.appendChild(el('p', 'sh-note', '二维码没有加载出来，可以先复制链接，再粘贴到微信里。'));
+    var url = state.url;
+    function paintQr() {
+      if (ui.sub.getAttribute('data-view') !== 'wx' || state.url !== url) return;
+      fig.innerHTML = '';
+      var svg = qrSvg(url, '本页链接的二维码');
+      if (svg) fig.appendChild(svg);
+      else fig.appendChild(el('p', 'sh-note', '二维码没有加载出来，可以先复制链接，再粘贴到微信里。'));
+    }
+    if (typeof W.qrcode === 'function') paintQr();
+    else {
+      var wait = el('p', 'sh-note', '正在生成二维码…');
+      wait.setAttribute('role', 'status');
+      fig.appendChild(wait);
+      loadQr().then(paintQr);
+    }
     wrap.appendChild(fig);
     wrap.appendChild(el('p', 'sh-qr-t', '用微信扫一扫，打开后点右上角分享给朋友'));
     ui.sub.appendChild(wrap);
@@ -511,7 +539,8 @@
       D.fonts.load('48px ' + F_READ.split(',')[0], '文').catch(function () {})
     ]), 3000) : Promise.resolve();
     var cover = withTimeout(loadImage(meta.cover).catch(function () { return null; }), 4000);
-    return Promise.all([fontsReady, cover]).then(function (r) {
+    var qr = withTimeout(loadQr(), 4000);   // 二维码库没加载出来时，页脚退回网址文字
+    return Promise.all([fontsReady, cover, qr]).then(function (r) {
       var im = r[1] || null;
       var cv = drawCard(kind, im);
       return exportCanvas(cv).catch(function (e) {
