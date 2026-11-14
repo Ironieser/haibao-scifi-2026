@@ -674,8 +674,18 @@
     render();
   }
 
+  // 操作条可见时收起浮动的阅读工具（只在窄屏的 CSS 中生效），面板打开时不收起
+  function tuckDock() {
+    var dock = document.querySelector('.dock'), bar = document.querySelector('.actions');
+    if (!dock || !bar || !('IntersectionObserver' in window)) return;
+    new IntersectionObserver(function (es) {
+      var open = dock.querySelector('[aria-expanded="true"]');
+      dock.classList.toggle('is-tucked', es[0].isIntersecting && !open);
+    }).observe(bar);
+  }
+
   device();
   if (page === 'home') initHome();
-  else if (page === 'work') initWork();
+  else if (page === 'work') { initWork(); tuckDock(); }
   else if (page === 'favorites') initFavorites();
 })();

@@ -494,3 +494,10 @@ html:not(.js) .js-only { display: none !important; }
   :root:not([data-theme="light"]) .hero-art { filter: invert(1) hue-rotate(180deg); mix-blend-mode: screen; opacity: .9; }
 }
 :root[data-theme="dark"] .hero-art { filter: invert(1) hue-rotate(180deg); mix-blend-mode: screen; opacity: .9; }
+
+/* 窄屏：阅读工具在操作条滚出视口后才出现，避免压住「点赞 / 收藏 / 下载」 */
+@media (max-width: 719px) {
+  .dock { transition: opacity .2s, transform .2s; }
+  .dock.is-tucked { opacity: 0; transform: translateY(12px); pointer-events: none; }
+}
+@media (prefers-reduced-motion: reduce) { .dock { transition: none; } }

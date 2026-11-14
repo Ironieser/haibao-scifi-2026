@@ -291,6 +291,19 @@ class Ctx:
     meta = None
 
 
+def og_image_tags(path):
+    """分享预览图：作品页用 /assets/og/<id>.jpg，其余页面用首页图（文件由 scripts/og.py 生成）。"""
+    m = re.match(r"^/works/([a-z0-9-]+)/", path)
+    name = m.group(1) if m else "home"
+    f = DIST / "assets" / "og" / f"{name}.jpg"
+    if not f.exists():
+        return '<meta name="twitter:card" content="summary">'
+    src = f"{SITE}/assets/og/{name}.jpg?v={sha8(f.read_bytes())}"
+    return (f'<meta property="og:image" content="{src}">\n'
+            '<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n'
+            f'<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:image" content="{src}">')
+
+
 def shell(ctx, *, title, desc, path, page, body, body_attrs="", og_type="website", extra_head=""):
     url = SITE + path
     font_preload = ""
@@ -311,7 +324,7 @@ def shell(ctx, *, title, desc, path, page, body, body_attrs="", og_type="website
 <meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:url" content="{esc(url)}">
-<meta name="twitter:card" content="summary">
+{og_image_tags(path)}
 <meta name="theme-color" content="#EEEFEA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#17192B" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
