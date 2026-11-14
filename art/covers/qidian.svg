@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>一块蓝色的阅读屏与一张黄色的生活清单错位叠在一起，两边的文字行有的严丝合缝、有的错开一格；屏幕顶端的空搜索框里只剩一枚光标</title>
+<defs>
+<pattern id="qidian-dots-b" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(15)"><circle cx="4" cy="4" r="1.6" fill="#0078BF"/></pattern>
+<pattern id="qidian-dots-y" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><circle cx="3.5" cy="3.5" r="1.8" fill="#FFE800"/></pattern>
+<filter id="qidian-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2.2 1.4"/></filter>
+<clipPath id="qidian-phone"><rect x="84" y="66" width="270" height="500" rx="26"/></clipPath>
+<clipPath id="qidian-sheet"><rect x="250" y="112" width="276" height="478"/></clipPath>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<!-- 黄版：生活清单（套印错位） -->
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<rect x="250" y="112" width="276" height="478" fill="url(#qidian-dots-y)"/>
+<rect x="250" y="112" width="276" height="478" fill="#FFE800" opacity="0.28"/>
+<g fill="#FFE800" clip-path="url(#qidian-sheet)">
+<rect x="300" y="150" width="236" height="11"/>
+<rect x="276" y="174" width="200" height="11"/>
+<rect x="276" y="198" width="236" height="11"/>
+<rect x="276" y="246" width="224" height="11"/>
+<rect x="300" y="270" width="210" height="11"/>
+<rect x="276" y="306" width="236" height="11"/>
+<rect x="276" y="330" width="224" height="11"/>
+<rect x="276" y="342" width="210" height="11"/>
+<rect x="276" y="366" width="224" height="11"/>
+<rect x="276" y="414" width="224" height="11"/>
+<rect x="276" y="438" width="236" height="11"/>
+<rect x="276" y="474" width="236" height="11"/>
+<rect x="276" y="486" width="210" height="11"/>
+<rect x="300" y="510" width="224" height="11"/>
+<rect x="276" y="534" width="200" height="11"/>
+</g>
+</g>
+<!-- 蓝版：阅读屏 -->
+<g style="mix-blend-mode:multiply">
+<rect x="96" y="76" width="270" height="500" rx="26" fill="url(#qidian-dots-b)" opacity="0.7"/>
+<rect x="84" y="66" width="270" height="500" rx="26" fill="#0078BF" opacity="0.3"/>
+<rect x="84" y="66" width="270" height="500" rx="26" fill="none" stroke="#0078BF" stroke-width="6"/>
+<rect x="104" y="92" width="230" height="32" rx="16" fill="#0078BF" opacity="0.5"/>
+<g fill="#0078BF" clip-path="url(#qidian-phone)">
+<rect x="108" y="150" width="180" height="9"/>
+<rect x="108" y="174" width="180" height="9"/>
+<rect x="108" y="198" width="82" height="9"/><rect x="202" y="198" width="120" height="9"/>
+<rect x="108" y="222" width="196" height="9"/>
+<rect x="108" y="246" width="69" height="9"/><rect x="189" y="246" width="133" height="9"/>
+<rect x="108" y="270" width="200" height="9"/>
+<rect x="108" y="294" width="220" height="9"/>
+<rect x="108" y="318" width="196" height="9"/>
+<rect x="108" y="342" width="83" height="9"/><rect x="203" y="342" width="125" height="9"/>
+<rect x="108" y="366" width="106" height="9"/><rect x="226" y="366" width="82" height="9"/>
+<rect x="108" y="390" width="79" height="9"/><rect x="199" y="390" width="129" height="9"/>
+<rect x="108" y="414" width="226" height="9"/>
+<rect x="108" y="438" width="68" height="9"/><rect x="188" y="438" width="140" height="9"/>
+<rect x="108" y="462" width="200" height="9"/>
+<rect x="108" y="486" width="85" height="9"/><rect x="205" y="486" width="99" height="9"/>
+<rect x="108" y="510" width="98" height="9"/><rect x="218" y="510" width="86" height="9"/>
+<rect x="108" y="534" width="54" height="9"/><rect x="174" y="534" width="44" height="9"/>
+</g>
+</g>
+<!-- 墨版：光标与对照刻度 -->
+<g style="mix-blend-mode:multiply" transform="translate(-2 1)" stroke="#1E2140" fill="none" stroke-linecap="round">
+<path d="M126 99V117" stroke-width="3.5"/>
+<circle cx="312" cy="107" r="7" stroke-width="2"/><path d="M317 112L323 118" stroke-width="2"/>
+<path d="M190 76H248" stroke-width="2"/>
+<path d="M544 154H556M544 298H556M544 442H556M544 154V560" stroke-width="1.4"/>
+<circle cx="550" cy="322" r="4" fill="#1E2140" stroke="none"/>
+</g>
+<rect width="600" height="800" filter="url(#qidian-grain)" opacity="0.12"/>
+</svg>

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+<title>海豹在浮冰上仰望星轨，鼻尖顶着一颗沿轨道运行的小月亮，海面倒映成示波器网格上的波形</title>
+<defs>
+<pattern id="hero-dots-b" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(15)"><circle cx="4.5" cy="4.5" r="1.8" fill="#0078BF"/></pattern>
+<pattern id="hero-dots-p" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(-20)"><circle cx="4" cy="4" r="2" fill="#FF48B0"/></pattern>
+<pattern id="hero-dots-y" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="3.5" cy="3.5" r="1.8" fill="#FFE800"/></pattern>
+<filter id="hero-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+</defs>
+<rect width="1200" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<path d="M520 566H1164V764H640Z" fill="url(#hero-dots-b)" opacity="0.55"/>
+<g fill="none" stroke="#0078BF" stroke-width="1.5" opacity="0.6">
+<path d="M544 606H1164M568 646H1164M593 686H1164M617 726H1164"/>
+<path d="M600 698V764M680 566V764M760 566V764M840 566V764M920 566V764M1000 566V764M1080 566V764M1160 566V764"/>
+</g>
+<path d="M520 566H1164" stroke="#0078BF" stroke-width="3"/>
+<path d="M36 566H520" stroke="#0078BF" stroke-width="1.5" opacity="0.5"/>
+<ellipse cx="930" cy="240" rx="330" ry="141" transform="rotate(-12 930 240)" fill="none" stroke="#0078BF" stroke-width="5"/>
+<ellipse cx="980" cy="210" rx="190" ry="58" transform="rotate(10 980 210)" fill="none" stroke="#0078BF" stroke-width="3"/>
+<path d="M632 543H1134L1150 560L1120 594H662L626 566Z" fill="url(#hero-dots-b)"/>
+<path d="M626 566L662 594H1120L1140 572Z" fill="#0078BF" opacity="0.4"/>
+<path d="M664 410C660 400 668 391 682 389C704 382 728 382 746 393C776 410 796 444 836 464C904 488 990 486 1064 500L1108 484L1094 516L1112 538L1056 528C990 542 870 546 790 542C750 540 728 520 718 494C712 470 706 450 690 436Z" fill="#0078BF"/>
+</g>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<circle cx="1020" cy="170" r="74" fill="url(#hero-dots-p)"/>
+<path d="M1020 96A74 74 0 0 1 1020 244A52 74 0 0 0 1020 96Z" fill="#FF48B0"/>
+<path d="M664 410C660 400 668 391 682 389C704 382 728 382 746 393C752 397 758 402 762 407C736 408 712 424 700 444L690 436Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M780 540L820 536L770 560Z" fill="#FF48B0"/>
+<path d="M590 676H640L652 668L664 690L676 650L690 700L702 664L712 682L724 676H1164" fill="none" stroke="#FF48B0" stroke-width="3"/>
+</g>
+<g style="mix-blend-mode:multiply" transform="translate(-3 2)">
+<circle cx="664" cy="366" r="17" fill="#FFE800"/>
+<path d="M560 626H650C680 626 690 700 720 704C760 708 780 656 830 650C900 644 1000 646 1064 640L1090 634L1108 618V626H1164" fill="none" stroke="#FFE800" stroke-width="6" stroke-linejoin="round"/>
+<path d="M860 92L866 112L886 118L866 124L860 144L854 124L834 118L854 112Z" fill="#FFE800"/>
+<circle cx="1110" cy="330" r="34" fill="url(#hero-dots-y)"/>
+</g>
+<g fill="none" stroke="#1E2140" stroke-width="2">
+<ellipse cx="930" cy="240" rx="440" ry="200" transform="rotate(-12 930 240)" stroke-dasharray="2 14"/>
+<path d="M742 156L812 108L860 118M812 108L790 60M1110 330L1150 420M1110 330L1170 270"/>
+<path d="M632 543H1134L1150 560L1120 594H662L626 566Z"/>
+<path d="M668 400L640 396M668 404L642 410"/>
+</g>
+<g fill="#1E2140">
+<circle cx="742" cy="156" r="4"/><circle cx="812" cy="108" r="5"/><circle cx="790" cy="60" r="3"/><circle cx="1150" cy="420" r="3"/><circle cx="1170" cy="270" r="3"/>
+<circle cx="704" cy="398" r="4"/>
+<circle cx="360" cy="120" r="2"/><circle cx="210" cy="260" r="2"/><circle cx="460" cy="330" r="2"/><circle cx="120" cy="90" r="2"/>
+</g>
+<rect width="1200" height="800" filter="url(#hero-grain)" opacity="0.12"/>
+</svg>

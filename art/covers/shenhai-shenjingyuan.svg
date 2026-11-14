@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>七千米深渊里，探照灯照亮一张由无数栉水母以细丝相连的巨大神经网，网上方浮着一段重复出现的脑波信号</title>
+<defs>
+<pattern id="shenhai-shenjingyuan-dots-b" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(20)"><circle cx="4" cy="4" r="1.7" fill="#0078BF"/></pattern>
+<filter id="shenhai-shenjingyuan-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+<linearGradient id="shenhai-shenjingyuan-deep" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0078BF" stop-opacity="0.35"/><stop offset="1" stop-color="#0078BF" stop-opacity="1"/></linearGradient>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<rect x="36" y="36" width="528" height="560" fill="url(#shenhai-shenjingyuan-deep)"/>
+<rect x="36" y="300" width="528" height="296" fill="url(#shenhai-shenjingyuan-dots-b)"/>
+</g>
+<path d="M300 92L120 520H480Z" fill="#EEEFEA" opacity="0.55"/>
+<g stroke="#1E2140" stroke-width="1.2" opacity="0.8">
+<path d="M108 312L172 312"/>
+<path d="M108 312L76 362"/>
+<path d="M108 312L140 362"/>
+<path d="M172 312L236 312"/>
+<path d="M172 312L140 362"/>
+<path d="M172 312L204 362"/>
+<path d="M236 312L300 312"/>
+<path d="M236 312L204 362"/>
+<path d="M236 312L268 362"/>
+<path d="M300 312L364 312"/>
+<path d="M300 312L268 362"/>
+<path d="M300 312L332 362"/>
+<path d="M364 312L428 312"/>
+<path d="M364 312L332 362"/>
+<path d="M364 312L396 362"/>
+<path d="M428 312L492 312"/>
+<path d="M428 312L396 362"/>
+<path d="M428 312L460 362"/>
+<path d="M492 312L460 362"/>
+<path d="M492 312L524 362"/>
+<path d="M76 362L140 362"/>
+<path d="M76 362L108 412"/>
+<path d="M140 362L204 362"/>
+<path d="M140 362L108 412"/>
+<path d="M140 362L172 412"/>
+<path d="M204 362L268 362"/>
+<path d="M204 362L172 412"/>
+<path d="M204 362L236 412"/>
+<path d="M268 362L332 362"/>
+<path d="M268 362L236 412"/>
+<path d="M268 362L300 412"/>
+<path d="M332 362L396 362"/>
+<path d="M332 362L300 412"/>
+<path d="M332 362L364 412"/>
+<path d="M396 362L460 362"/>
+<path d="M396 362L364 412"/>
+<path d="M396 362L428 412"/>
+<path d="M460 362L524 362"/>
+<path d="M460 362L428 412"/>
+<path d="M460 362L492 412"/>
+<path d="M524 362L492 412"/>
+<path d="M108 412L172 412"/>
+<path d="M108 412L76 462"/>
+<path d="M108 412L140 462"/>
+<path d="M172 412L236 412"/>
+<path d="M172 412L140 462"/>
+<path d="M172 412L204 462"/>
+<path d="M236 412L300 412"/>
+<path d="M236 412L204 462"/>
+<path d="M236 412L268 462"/>
+<path d="M300 412L364 412"/>
+<path d="M300 412L268 462"/>
+<path d="M300 412L332 462"/>
+<path d="M364 412L428 412"/>
+<path d="M364 412L332 462"/>
+<path d="M364 412L396 462"/>
+<path d="M428 412L492 412"/>
+<path d="M428 412L396 462"/>
+<path d="M428 412L460 462"/>
+<path d="M492 412L460 462"/>
+<path d="M492 412L524 462"/>
+<path d="M76 462L140 462"/>
+<path d="M76 462L108 512"/>
+<path d="M140 462L204 462"/>
+<path d="M140 462L108 512"/>
+<path d="M140 462L172 512"/>
+<path d="M204 462L268 462"/>
+<path d="M204 462L172 512"/>
+<path d="M204 462L236 512"/>
+<path d="M268 462L332 462"/>
+<path d="M268 462L236 512"/>
+<path d="M268 462L300 512"/>
+<path d="M332 462L396 462"/>
+<path d="M332 462L300 512"/>
+<path d="M332 462L364 512"/>
+<path d="M396 462L460 462"/>
+<path d="M396 462L364 512"/>
+<path d="M396 462L428 512"/>
+<path d="M460 462L524 462"/>
+<path d="M460 462L428 512"/>
+<path d="M460 462L492 512"/>
+<path d="M524 462L492 512"/>
+<path d="M108 512L172 512"/>
+<path d="M172 512L236 512"/>
+<path d="M236 512L300 512"/>
+<path d="M300 512L364 512"/>
+<path d="M364 512L428 512"/>
+<path d="M428 512L492 512"/>
+</g>
+<ellipse cx="108" cy="312" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="172" cy="312" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="236" cy="312" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="300" cy="312" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="364" cy="312" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="428" cy="312" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="492" cy="312" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="76" cy="362" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="140" cy="362" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="204" cy="362" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="268" cy="362" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="332" cy="362" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="396" cy="362" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="460" cy="362" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="524" cy="362" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="108" cy="412" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="172" cy="412" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="236" cy="412" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="300" cy="412" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="364" cy="412" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="428" cy="412" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="492" cy="412" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="76" cy="462" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="140" cy="462" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="204" cy="462" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="268" cy="462" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="332" cy="462" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="396" cy="462" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="460" cy="462" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="524" cy="462" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="108" cy="512" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<ellipse cx="172" cy="512" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="236" cy="512" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="300" cy="512" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="364" cy="512" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="428" cy="512" rx="10" ry="15" fill="#EEEFEA" opacity="1"/>
+<ellipse cx="492" cy="512" rx="10" ry="15" fill="#EEEFEA" opacity="0.45"/>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<path d="M104 303V321M112 303V321" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M168 303V321M176 303V321" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M232 303V321M240 303V321" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M296 303V321M304 303V321" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M360 303V321M368 303V321" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M424 303V321M432 303V321" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M488 303V321M496 303V321" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M72 353V371M80 353V371" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M136 353V371M144 353V371" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M200 353V371M208 353V371" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M264 353V371M272 353V371" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M328 353V371M336 353V371" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M392 353V371M400 353V371" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M456 353V371M464 353V371" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M520 353V371M528 353V371" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M104 403V421M112 403V421" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M168 403V421M176 403V421" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M232 403V421M240 403V421" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M296 403V421M304 403V421" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M360 403V421M368 403V421" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M424 403V421M432 403V421" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M488 403V421M496 403V421" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M72 453V471M80 453V471" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M136 453V471M144 453V471" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M200 453V471M208 453V471" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M264 453V471M272 453V471" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M328 453V471M336 453V471" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M392 453V471M400 453V471" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M456 453V471M464 453V471" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M520 453V471M528 453V471" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M104 503V521M112 503V521" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M168 503V521M176 503V521" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M232 503V521M240 503V521" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M296 503V521M304 503V521" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M360 503V521M368 503V521" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M424 503V521M432 503V521" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+<path d="M488 503V521M496 503V521" stroke="#0078BF" stroke-width="2" stroke-dasharray="2 2"/>
+</g>
+<polyline points="76 196 78.8 202.8 81.6 205.5 84.4 203 87.2 198.2 90 195.9 92.8 198.8 95.6 205.6 98.4 212.2 101.2 214.3 104 211.2 106.8 205.9 109.6 203 112.4 205.2 115.2 211.1 118 216.3 120.8 217 123.6 212.3 126.4 205.5 129.2 201.4 132 202.3 134.8 206.8 137.6 210.5 140.4 209.5 143.2 203.3 146 195.4 148.8 190.4 151.6 190.6 154.4 194.4 157.2 197.4 160 195.8 162.8 189.3 165.6 181.5 168.4 177 171.2 177.9 174 182.5 176.8 186.3 179.6 185.5 182.4 180.2 185.2 173.8 188 171 190.8 173.8 193.6 180.2 196.4 185.5 199.2 186.3 202 182.5 204.8 177.9 207.6 177 210.4 181.5 213.2 189.3 216 195.8 218.8 197.4 221.6 194.4 224.4 190.6 227.2 190.4 230 195.4 232.8 203.3 235.6 209.5 238.4 210.5 241.2 206.8 244 202.3 246.8 201.4 249.6 205.5 252.4 212.3 255.2 217 258 216.3 260.8 211.1 263.6 205.2 266.4 203 269.2 205.9 272 211.2 274.8 214.3 277.6 212.2 280.4 205.6 283.2 198.8 286 195.9 288.8 198.2 291.6 203 294.4 205.5 297.2 202.8 300 196 302.8 189.3 305.6 186.8 308.4 189.6 311.2 194.8 314 197.6 316.8 195.4 319.6 189.2 322.4 183.4 325.2 182 328 185.9 330.8 191.9 333.6 195.5 336.4 193.9 339.2 188.4 342 183.5 344.8 183.1 347.6 187.8 350.4 194.4 353.2 198.3 356 196.9 358.8 191.8 361.6 187.2 364.4 187.3 367.2 192.3 370 198.9 372.8 202.6 375.6 200.9 378.4 195.6 381.2 191 384 191.1 386.8 196.1 389.6 202.4 392.4 205.6 395.2 203.4 398 197.7 400.8 193 403.6 193.1 406.4 197.9 409.2 203.9 412 206.6 414.8 203.9 417.6 197.9 420.4 193.1 423.2 193 426 197.7 428.8 203.4 431.6 205.6 434.4 202.4 437.2 196.1 440 191.1 442.8 191 445.6 195.6 448.4 200.9 451.2 202.6 454 198.9 456.8 192.3 459.6 187.3 462.4 187.2 465.2 191.8 468 196.9 470.8 198.3 473.6 194.4 476.4 187.8 479.2 183.1 482 183.5 484.8 188.4 487.6 193.9 490.4 195.5 493.2 191.9 496 185.9 498.8 182 501.6 183.4 504.4 189.2 507.2 195.4 510 197.6 512.8 194.8 515.6 189.6 518.4 186.8 521.2 189.3 524 196" fill="none" stroke="#1E2140" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M300 36V74" stroke="#1E2140" stroke-width="2"/>
+<rect x="282" y="74" width="36" height="22" rx="11" fill="#1E2140"/>
+<circle cx="300" cy="98" r="4" fill="#EEEFEA"/>
+<path d="M76 236V246M227 236V246M378 236V246M524 236V246" stroke="#1E2140" stroke-width="2"/>
+<rect width="600" height="800" filter="url(#shenhai-shenjingyuan-grain)" opacity="0.12"/>
+</svg>

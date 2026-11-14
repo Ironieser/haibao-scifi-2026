@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>山谷里的粉色射电天眼仰望蓝色星图，信号锁定的坐标被圈了七圈，圆心却空无一物</title>
+<defs>
+<pattern id="dengdai-geduo-dots-b" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(15)"><circle cx="4" cy="4" r="1.8" fill="#0078BF"/></pattern>
+<pattern id="dengdai-geduo-dots-p" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)"><circle cx="3.5" cy="3.5" r="1.7" fill="#FF48B0"/></pattern>
+<filter id="dengdai-geduo-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<circle cx="350" cy="230" r="190" fill="url(#dengdai-geduo-dots-b)"/>
+<g fill="none" stroke="#0078BF" stroke-width="2" opacity="0.8">
+<path d="M160 230H540M350 40V420"/>
+<ellipse cx="350" cy="230" rx="95" ry="190"/>
+<ellipse cx="350" cy="230" rx="190" ry="95"/>
+</g>
+<g fill="#0078BF">
+<circle cx="220" cy="120" r="5"/><circle cx="480" cy="330" r="4"/><circle cx="250" cy="330" r="6"/><circle cx="500" cy="120" r="3"/><circle cx="300" cy="380" r="3"/><circle cx="470" cy="70" r="4"/>
+</g>
+</g>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<path d="M40 580L110 436L150 480H320L362 426L420 496L478 452L560 580Z" fill="url(#dengdai-geduo-dots-p)"/>
+<path d="M130 480Q232 600 334 480Z" fill="#FF48B0"/>
+<path d="M210 486L374 196L386 184L256 490Z" fill="#FF48B0" opacity="0.45"/>
+<g fill="none" stroke="#FF48B0" stroke-width="10">
+<circle cx="380" cy="190" r="22"/>
+<circle cx="380" cy="190" r="38" stroke-width="7"/>
+<circle cx="380" cy="190" r="52" stroke-width="5"/>
+<circle cx="380" cy="190" r="64" stroke-width="4"/>
+<circle cx="380" cy="190" r="74" stroke-width="3"/>
+<circle cx="380" cy="190" r="83" stroke-width="2"/>
+<circle cx="380" cy="190" r="91" stroke-width="1.5"/>
+</g>
+</g>
+<circle cx="384" cy="187" r="13" fill="#EEEFEA"/>
+<g fill="none" stroke="#1E2140" stroke-width="2">
+<path d="M384 159V173M384 201V215M356 187H370M398 187H412"/>
+<path d="M130 480H334M110 436L232 404L362 426M232 404V418"/>
+<path d="M40 584H560" stroke-dasharray="3 9"/>
+</g>
+<rect x="224" y="414" width="16" height="10" fill="#1E2140"/>
+<rect width="600" height="800" filter="url(#dengdai-geduo-grain)" opacity="0.12"/>
+</svg>

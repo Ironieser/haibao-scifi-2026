@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>火星穹顶下的一只鸡尾酒杯，杯中酒液托着一颗带环的小行星，四圈轨道绕杯而行，象征酒馆见证的四个时代</title>
+<defs>
+<pattern id="zhuxingzhe-jiuguan-dots" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(15)"><circle cx="4" cy="4" r="1.7" fill="#0078BF"/></pattern>
+<pattern id="zhuxingzhe-jiuguan-dots-s" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(15)"><circle cx="3" cy="3" r="1.1" fill="#0078BF"/></pattern>
+<filter id="zhuxingzhe-jiuguan-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2.2 1.4"/></filter>
+<clipPath id="zhuxingzhe-jiuguan-planet"><circle cx="420" cy="178" r="104"/></clipPath>
+<clipPath id="zhuxingzhe-jiuguan-dome"><path d="M80 560A220 220 0 0 1 520 560Z"/></clipPath>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<!-- 蓝版·实地 -->
+<g fill="#0078BF">
+<path d="M80 560A220 220 0 0 1 520 560Z" opacity="0.35"/>
+<circle cx="420" cy="178" r="104" opacity="0.5"/>
+<path d="M80 560A220 220 0 0 1 520 560M190 560A110 220 0 0 1 410 560M300 340V560" fill="none" stroke="#0078BF" stroke-width="2" opacity="0.7"/>
+<path d="M232 352H368L300 438Z"/>
+<rect x="90" y="560" width="420" height="10" opacity="0.8"/>
+<rect x="150" y="582" width="300" height="4" opacity="0.45"/>
+</g>
+<!-- 蓝版·网点（套印错位） -->
+<g transform="translate(4 -3)">
+<g clip-path="url(#zhuxingzhe-jiuguan-planet)"><circle cx="372" cy="226" r="150" fill="url(#zhuxingzhe-jiuguan-dots)"/><circle cx="470" cy="214" r="22" fill="#0078BF" opacity="0.6"/><circle cx="392" cy="128" r="14" fill="#0078BF" opacity="0.6"/><circle cx="452" cy="132" r="8" fill="#0078BF" opacity="0.6"/></g>
+<g clip-path="url(#zhuxingzhe-jiuguan-dome)"><rect x="80" y="440" width="440" height="120" fill="url(#zhuxingzhe-jiuguan-dots-s)"/></g>
+<ellipse cx="300" cy="551" rx="74" ry="11" fill="#0078BF"/>
+</g>
+</g>
+<!-- 墨版 -->
+<g style="mix-blend-mode:multiply" transform="translate(-2 1)" fill="none" stroke="#1E2140" stroke-linecap="round">
+<path d="M204 330H396L300 452Z" stroke-width="3"/>
+<path d="M300 452V544" stroke-width="5"/>
+<path d="M226 548Q300 532 374 548" stroke-width="2"/>
+<g stroke-width="1.4" opacity="0.85">
+<ellipse cx="300" cy="400" rx="150" ry="40" transform="rotate(-14 300 400)"/>
+<ellipse cx="300" cy="400" rx="196" ry="56" transform="rotate(-14 300 400)" stroke-dasharray="2 7"/>
+<ellipse cx="300" cy="400" rx="236" ry="74" transform="rotate(-14 300 400)"/>
+<ellipse cx="300" cy="400" rx="262" ry="92" transform="rotate(-14 300 400)" stroke-dasharray="14 6 2 6"/>
+</g>
+<circle cx="300" cy="372" r="15" fill="#1E2140" stroke="none"/>
+<ellipse cx="300" cy="372" rx="32" ry="7" transform="rotate(-18 300 372)" stroke-width="2"/>
+<path d="M300 372L336 300" stroke-width="2"/>
+<path d="M120 150h14M127 143v14M190 92h10M195 87v10M86 300h10M91 295v10M520 420h12M526 414v12M262 128h8M266 124v8" stroke-width="1.6"/>
+</g>
+<g style="mix-blend-mode:multiply" fill="#1E2140">
+<circle cx="157" cy="440" r="4"/><circle cx="476" cy="330" r="3.5"/><circle cx="111" cy="514" r="3"/><circle cx="540" cy="270" r="3"/>
+<circle cx="230" cy="212" r="1.6"/><circle cx="350" cy="80" r="1.6"/><circle cx="150" cy="232" r="1.6"/><circle cx="560" cy="80" r="1.6"/><circle cx="70" cy="190" r="1.6"/>
+</g>
+<rect width="600" height="800" filter="url(#zhuxingzhe-jiuguan-grain)" opacity="0.12"/>
+</svg>

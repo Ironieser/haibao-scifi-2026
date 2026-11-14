@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>粉色的尖锐声波闯入蓝色静音区的音箱网格，被削平成一条温顺的蓝色正弦线，下方黄色进度条始终停在原地</title>
+<defs>
+<pattern id="jingyinqu-dots-b" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(20)"><circle cx="4" cy="4" r="1.7" fill="#0078BF"/></pattern>
+<pattern id="jingyinqu-dots-p" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-15)"><circle cx="3.5" cy="3.5" r="1.5" fill="#FF48B0"/></pattern>
+<pattern id="jingyinqu-dots-y" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><circle cx="3.5" cy="3.5" r="1.8" fill="#FFE800"/></pattern>
+<filter id="jingyinqu-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<rect x="76" y="520" width="448" height="40" fill="url(#jingyinqu-dots-y)"/>
+<rect x="76" y="520" width="112" height="40" fill="#FFE800"/>
+<path d="M44 110H150V430H44Z" fill="#FFE800" opacity="0.9"/>
+</g>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<circle cx="330" cy="262" r="186" fill="url(#jingyinqu-dots-b)"/>
+<circle cx="330" cy="262" r="162" fill="none" stroke="#0078BF" stroke-width="10" opacity="0.9"/>
+<circle cx="330" cy="262" r="124" fill="none" stroke="#0078BF" stroke-width="8" opacity="0.75"/>
+<circle cx="330" cy="262" r="88" fill="none" stroke="#0078BF" stroke-width="6" opacity="0.6"/>
+<circle cx="330" cy="262" r="30" fill="#0078BF"/>
+<polyline points="430 300 431.3 301.1 432.7 302.2 434 303.3 435.4 304.3 436.7 305.3 438 306.2 439.4 306.9 440.7 307.6 442.1 308.1 443.4 308.6 444.7 308.8 446.1 309 447.4 309 448.8 308.8 450.1 308.6 451.4 308.1 452.8 307.6 454.1 306.9 455.5 306.2 456.8 305.3 458.1 304.3 459.5 303.3 460.8 302.2 462.2 301.1 463.5 300 464.8 298.9 466.2 297.8 467.5 296.7 468.9 295.7 470.2 294.7 471.5 293.8 472.9 293.1 474.2 292.4 475.6 291.9 476.9 291.4 478.2 291.2 479.6 291 480.9 291 482.3 291.2 483.6 291.4 484.9 291.9 486.3 292.4 487.6 293.1 489 293.8 490.3 294.7 491.6 295.7 493 296.7 494.3 297.8 495.7 298.9 497 300 498.3 301.1 499.7 302.2 501 303.3 502.4 304.3 503.7 305.3 505 306.2 506.4 306.9 507.7 307.6 509.1 308.1 510.4 308.6 511.7 308.8 513.1 309 514.4 309 515.8 308.8 517.1 308.6 518.4 308.1 519.8 307.6 521.1 306.9 522.5 306.2 523.8 305.3 525.1 304.3 526.5 303.3 527.8 302.2 529.2 301.1 530.5 300 531.8 298.9 533.2 297.8 534.5 296.7 535.9 295.7 537.2 294.7 538.5 293.8 539.9 293.1 541.2 292.4 542.6 291.9 543.9 291.4 545.2 291.2 546.6 291 547.9 291 549.3 291.2 550.6 291.4 551.9 291.9 553.3 292.4 554.6 293.1 556 293.8 557.3 294.7 558.6 295.7 560 296.7 561.3 297.8 562.7 298.9 564 300" fill="none" stroke="#0078BF" stroke-width="7" stroke-linecap="round"/>
+</g>
+<g style="mix-blend-mode:multiply">
+<polygon points="44 300 58 202.6 72 386.5 86 182 100 381.6 114 189.2 128 400 142 219.3 156 407 170 238 184 362 198 238 212 362 226 238 240 362 254 241.7 268 358.8 282 238 296 362 310 241.1 324 348.8 338 239.6 352 331.5 366 253.9 380 329.5 394 276.9 408 319.1 422 282.3 436 318.2 450 289.9 460 300" fill="#FF48B0" opacity="0.92"/>
+<polyline points="44 300 58 202.6 72 386.5 86 182 100 381.6 114 189.2 128 400 142 219.3 156 407 170 238 184 362 198 238 212 362 226 238 240 362 254 241.7 268 358.8 282 238 296 362 310 241.1 324 348.8 338 239.6 352 331.5 366 253.9 380 329.5 394 276.9 408 319.1 422 282.3 436 318.2 450 289.9 460 300" fill="none" stroke="#FF48B0" stroke-width="5" stroke-linejoin="miter"/>
+<rect x="200" y="226" width="236" height="148" fill="url(#jingyinqu-dots-p)" opacity="0.8"/>
+</g>
+<g fill="none" stroke="#1E2140" stroke-width="2">
+<path d="M196 238H440M196 362H440" stroke-dasharray="6 6"/>
+<rect x="76" y="520" width="448" height="40"/>
+<path d="M188 510V570"/>
+</g>
+<path d="M181 504h14l-7 10z" fill="#1E2140"/>
+<circle cx="475.4" cy="117.6" r="5" fill="#1E2140"/>
+<circle cx="475.4" cy="400.4" r="5" fill="#1E2140"/>
+<circle cx="192.6" cy="400.4" r="5" fill="#1E2140"/>
+<circle cx="192.6" cy="117.6" r="5" fill="#1E2140"/>
+<rect width="600" height="800" filter="url(#jingyinqu-grain)" opacity="0.12"/>
+</svg>

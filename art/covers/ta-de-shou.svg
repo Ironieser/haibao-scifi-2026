@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>示波器网格前举起的一只手，网点印出的另一只手与它错位重叠，指尖画着细小的颤抖圆圈，信号线从平直变为抖动</title>
+<defs>
+<pattern id="ta-de-shou-dots" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(20)"><circle cx="4" cy="4" r="1.8" fill="#0078BF"/></pattern>
+<pattern id="ta-de-shou-grid" width="40" height="40" patternUnits="userSpaceOnUse" x="60" y="70"><path d="M0 0H40M0 0V40" fill="none" stroke="#0078BF" stroke-width="1"/></pattern>
+<filter id="ta-de-shou-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2.2 1.4"/></filter>
+<g id="ta-de-shou-hand">
+<rect x="222" y="148" width="40" height="190" rx="20" transform="rotate(-7 242 330)"/>
+<rect x="265" y="116" width="40" height="220" rx="20"/>
+<rect x="308" y="138" width="40" height="200" rx="20" transform="rotate(5 328 330)"/>
+<rect x="350" y="192" width="36" height="150" rx="18" transform="rotate(13 368 330)"/>
+<rect x="189" y="335" width="42" height="150" rx="21" transform="rotate(-29 210 410)"/>
+<path d="M224 310H384V448Q384 506 354 528V640H254V528Q224 506 224 448Z"/>
+</g>
+<clipPath id="ta-de-shou-frame"><rect x="60" y="70" width="480" height="520"/></clipPath>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<!-- 蓝版·示波器网格 -->
+<rect x="60" y="70" width="480" height="520" fill="url(#ta-de-shou-grid)" opacity="0.35"/>
+<rect x="60" y="70" width="480" height="520" fill="none" stroke="#0078BF" stroke-width="3" opacity="0.7"/>
+<path d="M60 330H540M300 70V590" stroke="#0078BF" stroke-width="1.5" opacity="0.5" stroke-dasharray="4 4"/>
+<!-- 蓝版·实地手 -->
+<g clip-path="url(#ta-de-shou-frame)"><use href="#ta-de-shou-hand" fill="#0078BF" opacity="0.8"/></g>
+<!-- 蓝版·网点手（另一个人，套印错位） -->
+<g transform="translate(4 -3)" clip-path="url(#ta-de-shou-frame)">
+<use href="#ta-de-shou-hand" fill="url(#ta-de-shou-dots)" transform="rotate(4 300 600) translate(26 -22)"/>
+</g>
+</g>
+<!-- 墨版 -->
+<g style="mix-blend-mode:multiply" transform="translate(-2 1)" fill="none" stroke="#1E2140" stroke-linecap="round" stroke-linejoin="round">
+<g stroke-width="1.6">
+<circle cx="225" cy="160" r="5"/>
+<circle cx="226" cy="159" r="10" stroke-dasharray="3 4"/>
+<circle cx="224" cy="161" r="16" stroke-dasharray="2 6"/>
+<circle cx="227" cy="160" r="23" stroke-dasharray="1 8"/>
+</g>
+<path d="M60 560H250L262 548 272 572 282 542 292 576 302 538 312 580 322 534 332 584 342 538 352 576 362 544 372 570 382 548 392 566 402 552 414 562 426 555 440 560H540" stroke-width="2.4"/>
+<path d="M80 90h22M80 90v22M520 90h-22M520 90v22" stroke-width="2"/>
+</g>
+<rect width="600" height="800" filter="url(#ta-de-shou-grain)" opacity="0.12"/>
+</svg>

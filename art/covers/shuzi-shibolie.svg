@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>渡口的隔离墙只开一道窄缝：左侧是层层黄色弹窗与杂乱噪声波，穿过缝隙后只剩一道干净的粉色正弦波，尽头是一株小草</title>
+<defs>
+<pattern id="shuzi-shibolie-dots-p" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><circle cx="4" cy="4" r="2" fill="#FF48B0"/></pattern>
+<pattern id="shuzi-shibolie-dots-y" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-10)"><circle cx="3.5" cy="3.5" r="2" fill="#FFE800"/></pattern>
+<filter id="shuzi-shibolie-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<rect x="44" y="64" width="180" height="112" fill="#FFE800"/>
+<rect x="44" y="64" width="180" height="16" fill="#FFE800"/>
+<rect x="132" y="128" width="190" height="104" fill="url(#shuzi-shibolie-dots-y)"/>
+<rect x="64" y="210" width="110" height="70" fill="#FFE800"/>
+<rect x="196" y="250" width="110" height="40" fill="#FFE800" opacity="0.7"/>
+<rect x="48" y="388" width="160" height="88" fill="#FFE800"/>
+<rect x="150" y="430" width="170" height="64" fill="url(#shuzi-shibolie-dots-y)"/>
+<rect x="210" y="372" width="96" height="44" fill="#FFE800" opacity="0.7"/>
+<path d="M44 330L58 292L70 364L84 270L96 376L110 300L120 350L134 252L148 392L160 296L172 356L186 276L198 384L212 304L224 352L238 288L250 368L262 318L272 330" fill="none" stroke="#FFE800" stroke-width="14" stroke-linejoin="bevel"/>
+<rect x="44" y="520" width="512" height="44" fill="url(#shuzi-shibolie-dots-y)"/>
+</g>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<path d="M256 48H336V312H256ZM256 348H336V580H256Z" fill="#FF48B0" opacity="0.9"/>
+<path d="M300 48H336V312H300ZM300 348H336V580H300Z" fill="url(#shuzi-shibolie-dots-p)"/>
+<path d="M336 330C358 330 360 262 384 262S410 398 434 398S460 262 484 262S510 330 524 330" fill="none" stroke="#FF48B0" stroke-width="16" stroke-linecap="round"/>
+<path d="M40 528H560V540H40ZM40 552H560V560H40Z" fill="#FF48B0" opacity="0.8"/>
+<path d="M540 300C520 290 508 272 510 252C528 260 540 278 540 300ZM540 286C556 274 570 270 576 262C574 284 560 294 540 296Z" fill="#FF48B0"/>
+</g>
+<g fill="none" stroke="#1E2140" stroke-width="2">
+<path d="M256 330H350"/>
+<path d="M244 312H256M244 348H256M244 312V348"/>
+<path d="M540 330V232"/>
+<path d="M52 72H68M52 396H68M72 218H88"/>
+</g>
+<circle cx="540" cy="228" r="5" fill="#1E2140"/>
+<rect width="600" height="800" filter="url(#shuzi-shibolie-grain)" opacity="0.12"/>
+</svg>

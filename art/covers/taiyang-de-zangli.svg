@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>粉色太阳被切成编号扇区像商品一样出售，蓝色萃取管从太空扎进日冕，一块扇区被整块抽离</title>
+<defs>
+<pattern id="taiyang-de-zangli-dots-b" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(20)"><circle cx="4" cy="4" r="1.7" fill="#0078BF"/></pattern>
+<pattern id="taiyang-de-zangli-dots-p" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-15)"><circle cx="3.5" cy="3.5" r="1.5" fill="#FF48B0"/></pattern>
+<filter id="taiyang-de-zangli-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<path d="M316 330L319.1 134A196 196 0 0 1 363.7 139.9L316 330Z" fill="#FF48B0" opacity="0.95"/>
+<path d="M316 330L369.7 141.5A196 196 0 0 1 411.3 158.7L316 330Z" fill="url(#taiyang-de-zangli-dots-p)"/>
+<path d="M316 330L416.7 161.8A196 196 0 0 1 452.4 189.2L316 330Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M316 330L456.8 193.6A196 196 0 0 1 484.2 229.3L316 330Z" fill="#FF48B0" opacity="0.95"/>
+<path d="M316 330L487.3 234.7A196 196 0 0 1 504.5 276.3L316 330Z" fill="url(#taiyang-de-zangli-dots-p)"/>
+<path d="M316 330L506.1 282.3A196 196 0 0 1 512 326.9L316 330Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M316 330L512 333.1A196 196 0 0 1 506.1 377.7L316 330Z" fill="#FF48B0" opacity="0.95"/>
+<path d="M316 330L484.2 430.7A196 196 0 0 1 456.8 466.4L316 330Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M316 330L452.4 470.8A196 196 0 0 1 416.7 498.2L316 330Z" fill="#FF48B0" opacity="0.95"/>
+<path d="M316 330L411.3 501.3A196 196 0 0 1 369.7 518.5L316 330Z" fill="url(#taiyang-de-zangli-dots-p)"/>
+<path d="M316 330L363.7 520.1A196 196 0 0 1 319.1 526L316 330Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M316 330L312.9 526A196 196 0 0 1 268.3 520.1L316 330Z" fill="#FF48B0" opacity="0.95"/>
+<path d="M316 330L262.3 518.5A196 196 0 0 1 220.7 501.3L316 330Z" fill="url(#taiyang-de-zangli-dots-p)"/>
+<path d="M316 330L215.3 498.2A196 196 0 0 1 179.6 470.8L316 330Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M316 330L175.2 466.4A196 196 0 0 1 147.8 430.7L316 330Z" fill="#FF48B0" opacity="0.95"/>
+<path d="M316 330L144.7 425.3A196 196 0 0 1 127.5 383.7L316 330Z" fill="url(#taiyang-de-zangli-dots-p)"/>
+<path d="M316 330L125.9 377.7A196 196 0 0 1 120 333.1L316 330Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M316 330L120 326.9A196 196 0 0 1 125.9 282.3L316 330Z" fill="#FF48B0" opacity="0.95"/>
+<path d="M316 330L127.5 276.3A196 196 0 0 1 144.7 234.7L316 330Z" fill="url(#taiyang-de-zangli-dots-p)"/>
+<path d="M316 330L147.8 229.3A196 196 0 0 1 175.2 193.6L316 330Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M316 330L179.6 189.2A196 196 0 0 1 215.3 161.8L316 330Z" fill="#FF48B0" opacity="0.95"/>
+<path d="M316 330L220.7 158.7A196 196 0 0 1 262.3 141.5L316 330Z" fill="url(#taiyang-de-zangli-dots-p)"/>
+<path d="M316 330L268.3 139.9A196 196 0 0 1 312.9 134L316 330Z" fill="#FF48B0" opacity="0.6"/>
+<path d="M316 330L504.5 383.7A196 196 0 0 1 487.3 425.3L316 330Z" fill="#FF48B0" transform="translate(64.7 26.8)"/>
+<circle cx="316" cy="330" r="214" fill="none" stroke="#FF48B0" stroke-width="6" stroke-dasharray="3 9" opacity="0.8"/>
+</g>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<path d="M42.8 172.3L172.2 247" stroke="#0078BF" stroke-width="13" stroke-linecap="round"/>
+<circle cx="172.2" cy="247" r="13" fill="#0078BF"/>
+<circle cx="133.4" cy="224.6" r="10" fill="#0078BF"/>
+<circle cx="94.6" cy="202.2" r="10" fill="#0078BF"/>
+<path d="M89.7 40.4L213.8 199.2" stroke="#0078BF" stroke-width="13" stroke-linecap="round"/>
+<circle cx="213.8" cy="199.2" r="13" fill="#0078BF"/>
+<circle cx="176.6" cy="151.6" r="10" fill="#0078BF"/>
+<circle cx="139.4" cy="103.9" r="10" fill="#0078BF"/>
+<path d="M200.2 43.5L253.8 176.1" stroke="#0078BF" stroke-width="13" stroke-linecap="round"/>
+<circle cx="253.8" cy="176.1" r="13" fill="#0078BF"/>
+<circle cx="237.7" cy="136.3" r="10" fill="#0078BF"/>
+<circle cx="221.7" cy="96.5" r="10" fill="#0078BF"/>
+<path d="M42.6 256.8L155.7 287" stroke="#0078BF" stroke-width="13" stroke-linecap="round"/>
+<circle cx="155.7" cy="287" r="13" fill="#0078BF"/>
+<circle cx="121.8" cy="278" r="10" fill="#0078BF"/>
+<circle cx="87.8" cy="268.9" r="10" fill="#0078BF"/>
+<path d="M275.7 43.3L292.9 165.6" stroke="#0078BF" stroke-width="13" stroke-linecap="round"/>
+<circle cx="292.9" cy="165.6" r="13" fill="#0078BF"/>
+<circle cx="287.7" cy="128.9" r="10" fill="#0078BF"/>
+<circle cx="282.6" cy="92.2" r="10" fill="#0078BF"/>
+<ellipse cx="316" cy="330" rx="250" ry="70" fill="none" stroke="#0078BF" stroke-width="4" transform="rotate(-18 316 330)" opacity="0.85"/>
+<path d="M120 330A196 196 0 0 0 512 330Z" fill="#0078BF" opacity="0.38"/>
+<path d="M80 330A236 236 0 0 0 552 330L512 330A196 196 0 0 1 120 330Z" fill="url(#taiyang-de-zangli-dots-b)"/>
+<path d="M96 590Q300 520 520 470" fill="none" stroke="#0078BF" stroke-width="3" stroke-dasharray="14 8" opacity="0.8"/>
+</g>
+<g fill="none" stroke="#1E2140" stroke-width="2">
+<path d="M316 104L316 82"/>
+<path d="M374.5 111.7L377.1 102"/>
+<path d="M429 134.3L434 125.6"/>
+<path d="M475.8 170.2L482.9 163.1"/>
+<path d="M511.7 217L520.4 212"/>
+<path d="M534.3 271.5L544 268.9"/>
+<path d="M542 330L564 330"/>
+<path d="M534.3 388.5L544 391.1"/>
+<path d="M511.7 443L520.4 448"/>
+<path d="M475.8 489.8L482.9 496.9"/>
+<path d="M429 525.7L434 534.4"/>
+<path d="M374.5 548.3L377.1 558"/>
+<path d="M316 556L316 578"/>
+<path d="M257.5 548.3L254.9 558"/>
+<path d="M203 525.7L198 534.4"/>
+<path d="M156.2 489.8L149.1 496.9"/>
+<path d="M120.3 443L111.6 448"/>
+<path d="M97.7 388.5L88 391.1"/>
+<path d="M90 330L68 330"/>
+<path d="M97.7 271.5L88 268.9"/>
+<path d="M120.3 217L111.6 212"/>
+<path d="M156.2 170.2L149.1 163.1"/>
+<path d="M203 134.3L198 125.6"/>
+<path d="M257.5 111.7L254.9 102"/>
+<path d="M380.7 356.8L316 330" stroke-dasharray="4 5"/>
+</g>
+<circle cx="520" cy="470" r="5" fill="#1E2140"/>
+<rect width="600" height="800" filter="url(#taiyang-de-zangli-grain)" opacity="0.12"/>
+</svg>

@@ -1,0 +1,20 @@
+// 线上部署配置（Workers + 静态资源）。静态请求直接命中资源、不消耗 Worker 调用；只有 /api/* 进入 Worker。
+// 部署：npx wrangler deploy -c wrangler.worker.jsonc
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "haibao-scifi",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "haibao", "database_id": "2982a88f-5088-4813-8a57-c3b39751aef8" }
+  ],
+  "routes": [{ "pattern": "scifi.ironieser.cc", "custom_domain": true }],
+  "observability": { "enabled": true }
+}

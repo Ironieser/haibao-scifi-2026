@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>被揭起一角的无知之幕下，粉色时间环逆行回到昨天、蓝色时间环顺行走向明天，两枚箭头在“今天”相遇</title>
+<defs>
+<pattern id="huidao-mingtian-dots-b" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(20)"><circle cx="4" cy="4" r="1.7" fill="#0078BF"/></pattern>
+<pattern id="huidao-mingtian-dots-p" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-15)"><circle cx="3.5" cy="3.5" r="1.5" fill="#FF48B0"/></pattern>
+<filter id="huidao-mingtian-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<g transform="matrix(1.15 0 0 1.15 -46 -8)"><circle cx="318" cy="358" r="124" fill="url(#huidao-mingtian-dots-b)"/>
+<path d="M188.1 433A150 150 0 1 1 344 505.7" fill="none" stroke="#0078BF" stroke-width="28"/>
+<path d="M344 476l-48 34 52 26z" fill="#0078BF"/>
+</g>
+</g>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<g transform="matrix(1.15 0 0 1.15 -46 -8)"><path d="M417.9 457A150 150 0 1 0 262 529.7" fill="none" stroke="#FF48B0" stroke-width="28" opacity="0.9"/>
+<path d="M258 500l48 32-52 28z" fill="#FF48B0"/>
+<circle cx="318" cy="358" r="54" fill="#FF48B0" opacity="0.5"/>
+</g>
+<path d="M40 40H560V96C520 118 470 150 420 200C340 214 250 206 160 214C110 218 70 214 40 222Z" fill="url(#huidao-mingtian-dots-p)"/>
+<path d="M40 40H104V218L40 222ZM168 40H232V208L168 213ZM296 40H360V208L296 206Z" fill="#FF48B0" opacity="0.7"/>
+<path d="M560 96C520 118 470 150 420 200C470 186 520 172 560 176Z" fill="#FF48B0"/>
+</g>
+<g transform="matrix(1.15 0 0 1.15 -46 -8)"><g fill="none" stroke="#1E2140" stroke-width="2">
+<circle cx="303" cy="365" r="186" stroke-dasharray="2 17"/>
+<path d="M303 365l58-82M303 365l-36 52"/>
+</g>
+<circle cx="303" cy="365" r="7" fill="#1E2140"/>
+<circle cx="303" cy="522" r="7" fill="#1E2140"/>
+</g>
+<path d="M424 197C474 183 524 169 564 173" fill="none" stroke="#1E2140" stroke-width="2"/>
+<rect width="600" height="800" filter="url(#huidao-mingtian-grain)" opacity="0.12"/>
+</svg>

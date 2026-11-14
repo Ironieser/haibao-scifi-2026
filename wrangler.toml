@@ -1,0 +1,13 @@
+name = "haibao-scifi"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "haibao"
+database_id = "2982a88f-5088-4813-8a57-c3b39751aef8"
+
+# 线上 secret（不要写在这里）：
+#   npx wrangler pages secret put SALT --project-name haibao-scifi
+#   npx wrangler pages secret put ADMIN_TOKEN --project-name haibao-scifi
+# 本地开发使用 .dev.vars

@@ -1,0 +1,48 @@
+{
+  "contest": {
+    "name": "2026年海豹杯科幻文学大赛",
+    "short": "海豹杯",
+    "year": 2026,
+    "host": "睡前消息",
+    "announcedBy": "马督工",
+    "announcedAt": "2026-11-14T20:17:00+08:00",
+    "aiNote": "本次获奖所有作品，除《逐星者酒馆》、《她的手》、《婴儿工厂》、《转人工》，均使用或明确声称使用了AI辅助"
+  },
+  "juries": [
+    {"id": "human", "name": "人类评委奖", "tiers": [
+      {"id": "special", "name": "特别奖", "prize": 30000, "each": false, "works": ["huidao-mingtian"]},
+      {"id": "first", "name": "一等奖", "prize": 30000, "each": false, "works": ["zhuan-rengong"]},
+      {"id": "second", "name": "二等奖", "prize": 20000, "each": true, "works": ["yiqie-ruchang", "shuzi-shibolie"]},
+      {"id": "third", "name": "三等奖", "prize": 10000, "each": true, "works": ["dengdai-geduo", "qinfen-de-heli", "jingyinqu", "taiyang-de-zangli", "gongzuo"]}
+    ]},
+    {"id": "ai", "name": "AI评委奖", "tiers": [
+      {"id": "special", "name": "特别奖", "prize": 32768, "each": false, "works": ["huidao-mingtian"]},
+      {"id": "first", "name": "一等奖", "prize": 16384, "each": true, "works": ["zhuan-rengong", "mr-man"]},
+      {"id": "second", "name": "二等奖", "prize": 8192, "each": true, "works": ["yinger-gongchang", "taiyang-de-zangli", "shenhai-shenjingyuan", "dengdai-geduo"]},
+      {"id": "third", "name": "三等奖", "prize": 4096, "each": true, "works": ["zhuxingzhe-jiuguan", "ta-de-shou", "xinming-de-zangli", "qidian", "gongzuo", "shengri-dangao", "jingyinqu", "suoluomen"]}
+    ]},
+    {"id": "rod", "name": "鱼竿奖", "tiers": [
+      {"id": "rod", "name": "鱼竿奖", "prize": 4000, "each": true, "works": ["jingyinqu", "gongzuo", "xinming-de-zangli", "shuzi-shibolie", "qidian"]}
+    ]}
+  ],
+  "works": [
+    {"id": "huidao-mingtian", "title": "回到明天", "author": "于泽越", "ai": true, "src": ["11-于泽越：回到明天.docx"]},
+    {"id": "zhuan-rengong", "title": "转人工", "author": "唐梦", "ai": false, "src": ["20260322-《转人工》-唐梦.docx"]},
+    {"id": "yiqie-ruchang", "title": "一切如常", "author": "冯华炜", "ai": true, "src": ["一切如常-冯华玮/小说/第一章_托管.pdf", "一切如常-冯华玮/小说/第二章_代理期.pdf", "一切如常-冯华玮/小说/第三章_回归.pdf", "一切如常-冯华玮/小说/第四章_扮演.pdf", "一切如常-冯华玮/小说/第五章_真相.pdf", "一切如常-冯华玮/小说/尾声_独白.pdf"]},
+    {"id": "shuzi-shibolie", "title": "数字示播列", "author": "余哲闻", "ai": true, "src": ["数字士播列.pdf"]},
+    {"id": "dengdai-geduo", "title": "等待戈多之星", "author": "王健", "ai": true, "src": ["等待戈多之星.docx"]},
+    {"id": "qinfen-de-heli", "title": "勤奋的河狸", "author": "李冰", "ai": true, "src": ["07-李冰：勤奋的河狸/勤奋的河狸-正文.docx"], "notes": [["写作方法", "07-李冰：勤奋的河狸/勤奋的河狸-写作方法.docx"]]},
+    {"id": "jingyinqu", "title": "静音区", "author": "郝淑梅", "ai": true, "src": ["49-郝淑梅：静音区/《静音区》.pdf"], "notes": [["写作说明", "49-郝淑梅：静音区/《静音区》写作说明.pdf"]]},
+    {"id": "taiyang-de-zangli", "title": "太阳的葬礼", "author": "陈俊宇", "ai": true, "src": ["2026科幻征文_《太阳的葬礼》.docx"]},
+    {"id": "gongzuo", "title": "工作", "author": "张伟凌", "ai": true, "src": ["110-张伟凌：工作/投稿小说《工作》.docx"], "notes": [["鱼竿奖写作说明", "110-张伟凌：工作/鱼竿奖写作说明.docx"]]},
+    {"id": "mr-man", "title": "MR.MAN", "author": "王良", "ai": true, "src": ["《MR.MAN》.docx"]},
+    {"id": "yinger-gongchang", "title": "婴儿工厂", "author": "侯博文", "ai": false, "src": ["383-侯博文：婴儿工厂.docx"]},
+    {"id": "shenhai-shenjingyuan", "title": "深海神经元", "author": "王凯", "ai": true, "src": ["深海神经元.docx"]},
+    {"id": "zhuxingzhe-jiuguan", "title": "逐星者酒馆", "author": "灰一", "ai": false, "src": ["glob:*逐星者酒馆*.docx"]},
+    {"id": "ta-de-shou", "title": "她的手", "author": "吕宣洋", "ai": false, "src": ["141-吕宣洋：她的手.docx"]},
+    {"id": "xinming-de-zangli", "title": "新明的葬礼", "author": "黄陈军", "ai": true, "src": ["128-黄陈军：新明的葬礼/新明的葬礼.docx"], "notes": [["VibeNoving SOP 使用方法", "128-黄陈军：新明的葬礼/VibeNoving  v0.5.5 SOP使用方法（作者提供）.pdf"]]},
+    {"id": "qidian", "title": "起点", "author": "任童洲", "ai": true, "src": ["65-任童洲：起点/起点.docx"], "notes": [["AI 使用记录", "65-任童洲：起点/【起点·鱼竿奖】AI使用记录.docx"]]},
+    {"id": "shengri-dangao", "title": "生日蛋糕", "author": "韩响", "ai": true, "src": ["124-韩响：生日蛋糕/生日蛋糕.docx"], "notes": [["AI 使用说明", "124-韩响：生日蛋糕/ai使用说明.txt"]]},
+    {"id": "suoluomen", "title": "“所罗门”测试用例", "author": "乔莹", "ai": true, "src": ["64-乔莹：“所罗门”测试用例/“所罗门”测试用例.docx"], "notes": [["写作说明", "64-乔莹：“所罗门”测试用例/《“所罗门”测试用例》写作说明.docx"]]}
+  ]
+}

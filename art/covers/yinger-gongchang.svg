@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>倒置之树般的管线把营养液分送到一排排相同的人工子宫舱，舱中蜷缩着胎儿，其中一舱空着，下方是一枚商品条形码</title>
+<defs>
+<pattern id="yinger-gongchang-dots-b" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(20)"><circle cx="4" cy="4" r="1.7" fill="#0078BF"/></pattern>
+<filter id="yinger-gongchang-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<path d="M300 44V140" stroke="#0078BF" stroke-width="18"/>
+<path d="M120 160H480" stroke="#0078BF" stroke-width="10"/>
+<path d="M300 140V160" stroke="#0078BF" stroke-width="10"/>
+<path d="M120 160V188" stroke="#0078BF" stroke-width="6"/>
+<path d="M120 284V296" stroke="#0078BF" stroke-width="6"/>
+<path d="M120 392V404" stroke="#0078BF" stroke-width="6"/>
+<path d="M240 160V188" stroke="#0078BF" stroke-width="6"/>
+<path d="M240 284V296" stroke="#0078BF" stroke-width="6"/>
+<path d="M240 392V404" stroke="#0078BF" stroke-width="6"/>
+<path d="M360 160V188" stroke="#0078BF" stroke-width="6"/>
+<path d="M360 284V296" stroke="#0078BF" stroke-width="6"/>
+<path d="M360 392V404" stroke="#0078BF" stroke-width="6"/>
+<path d="M480 160V188" stroke="#0078BF" stroke-width="6"/>
+<path d="M480 284V296" stroke="#0078BF" stroke-width="6"/>
+<path d="M480 392V404" stroke="#0078BF" stroke-width="6"/>
+<circle cx="120" cy="236" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="120" cy="236" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="113" cy="223" r="14" fill="#0078BF"/>
+<path d="M100 248A24 24 0 1 0 114.8 218.4A17 17 0 0 1 100 248Z" fill="#0078BF"/>
+<circle cx="240" cy="236" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="240" cy="236" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="233" cy="223" r="14" fill="#0078BF"/>
+<path d="M220 248A24 24 0 1 0 234.8 218.4A17 17 0 0 1 220 248Z" fill="#0078BF"/>
+<circle cx="360" cy="236" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="360" cy="236" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="353" cy="223" r="14" fill="#0078BF"/>
+<path d="M340 248A24 24 0 1 0 354.8 218.4A17 17 0 0 1 340 248Z" fill="#0078BF"/>
+<circle cx="480" cy="236" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="480" cy="236" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="473" cy="223" r="14" fill="#0078BF"/>
+<path d="M460 248A24 24 0 1 0 474.8 218.4A17 17 0 0 1 460 248Z" fill="#0078BF"/>
+<circle cx="120" cy="344" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="120" cy="344" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="113" cy="331" r="14" fill="#0078BF"/>
+<path d="M100 356A24 24 0 1 0 114.8 326.4A17 17 0 0 1 100 356Z" fill="#0078BF"/>
+<circle cx="240" cy="344" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="240" cy="344" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="233" cy="331" r="14" fill="#0078BF"/>
+<path d="M220 356A24 24 0 1 0 234.8 326.4A17 17 0 0 1 220 356Z" fill="#0078BF"/>
+<circle cx="360" cy="344" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="360" cy="344" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="353" cy="331" r="14" fill="#0078BF"/>
+<path d="M340 356A24 24 0 1 0 354.8 326.4A17 17 0 0 1 340 356Z" fill="#0078BF"/>
+<circle cx="480" cy="344" r="44" fill="#EEEFEA"/>
+<circle cx="120" cy="452" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="120" cy="452" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="113" cy="439" r="14" fill="#0078BF"/>
+<path d="M100 464A24 24 0 1 0 114.8 434.4A17 17 0 0 1 100 464Z" fill="#0078BF"/>
+<circle cx="240" cy="452" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="240" cy="452" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="233" cy="439" r="14" fill="#0078BF"/>
+<path d="M220 464A24 24 0 1 0 234.8 434.4A17 17 0 0 1 220 464Z" fill="#0078BF"/>
+<circle cx="360" cy="452" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="360" cy="452" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="353" cy="439" r="14" fill="#0078BF"/>
+<path d="M340 464A24 24 0 1 0 354.8 434.4A17 17 0 0 1 340 464Z" fill="#0078BF"/>
+<circle cx="480" cy="452" r="44" fill="url(#yinger-gongchang-dots-b)"/>
+<circle cx="480" cy="452" r="44" fill="#0078BF" opacity="0.35"/>
+<circle cx="473" cy="439" r="14" fill="#0078BF"/>
+<path d="M460 464A24 24 0 1 0 474.8 434.4A17 17 0 0 1 460 464Z" fill="#0078BF"/>
+</g>
+<g fill="none" stroke="#1E2140" stroke-width="2">
+<circle cx="120" cy="236" r="48"/>
+<circle cx="240" cy="236" r="48"/>
+<circle cx="360" cy="236" r="48"/>
+<circle cx="480" cy="236" r="48"/>
+<circle cx="120" cy="344" r="48"/>
+<circle cx="240" cy="344" r="48"/>
+<circle cx="360" cy="344" r="48"/>
+<circle cx="480" cy="344" r="44" stroke-dasharray="5 6"/>
+<circle cx="120" cy="452" r="48"/>
+<circle cx="240" cy="452" r="48"/>
+<circle cx="360" cy="452" r="48"/>
+<circle cx="480" cy="452" r="48"/>
+</g>
+<rect x="214" y="534" width="5" height="40" fill="#1E2140"/>
+<rect x="225" y="534" width="5" height="40" fill="#1E2140"/>
+<rect x="234" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="239" y="534" width="5" height="40" fill="#1E2140"/>
+<rect x="250" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="255" y="534" width="5" height="40" fill="#1E2140"/>
+<rect x="264" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="269" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="277" y="534" width="5" height="40" fill="#1E2140"/>
+<rect x="286" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="294" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="302" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="307" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="312" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="320" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="326" y="534" width="3" height="40" fill="#1E2140"/>
+<rect x="333" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="341" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="349" y="534" width="3" height="40" fill="#1E2140"/>
+<rect x="356" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="364" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="370" y="534" width="3" height="40" fill="#1E2140"/>
+<rect x="377" y="534" width="2" height="40" fill="#1E2140"/>
+<rect x="96" y="538" width="94" height="10" fill="#0078BF" opacity="0.5"/>
+<rect x="410" y="564" width="94" height="10" fill="#0078BF" opacity="0.5"/>
+<rect width="600" height="800" filter="url(#yinger-gongchang-grain)" opacity="0.12"/>
+</svg>

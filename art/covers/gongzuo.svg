@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<title>分层的社会剖面：顶层蓝色系统方块吞下一页页粉色评价报告，下面是成排的评价员工位、密密麻麻的协评员网点，最底层是逐张褪色清零的黄色消费券</title>
+<defs>
+<pattern id="gongzuo-dots-b" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(20)"><circle cx="4" cy="4" r="1.7" fill="#0078BF"/></pattern>
+<pattern id="gongzuo-dots-p" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-15)"><circle cx="3.5" cy="3.5" r="1.5" fill="#FF48B0"/></pattern>
+<pattern id="gongzuo-dots-y" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><circle cx="3.5" cy="3.5" r="1.8" fill="#FFE800"/></pattern>
+<filter id="gongzuo-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.118 0 0 0 0 0.129 0 0 0 0 0.251 0 0 0 -2 1.4"/></filter>
+</defs>
+<rect width="600" height="800" fill="#EEEFEA"/>
+<g style="mix-blend-mode:multiply">
+<rect x="64" y="500" width="68" height="86" fill="#FFE800" opacity="1"/>
+<rect x="144" y="500" width="68" height="86" fill="#FFE800" opacity="0.85"/>
+<rect x="224" y="500" width="68" height="86" fill="#FFE800" opacity="0.7"/>
+<rect x="304" y="500" width="68" height="86" fill="#FFE800" opacity="0.55"/>
+<rect x="384" y="500" width="68" height="86" fill="#FFE800" opacity="0.42"/>
+<rect x="464" y="500" width="68" height="86" fill="#FFE800" opacity="0.35"/>
+<rect x="44" y="476" width="512" height="18" fill="url(#gongzuo-dots-y)"/>
+</g>
+<g style="mix-blend-mode:multiply" transform="translate(4 -3)">
+<rect x="120" y="44" width="360" height="152" fill="#0078BF"/>
+<rect x="44" y="352" width="512" height="104" fill="url(#gongzuo-dots-b)"/>
+<rect x="44" y="352" width="512" height="104" fill="#0078BF" opacity="0.35"/>
+</g>
+<g style="mix-blend-mode:multiply">
+<rect x="52" y="258" width="52" height="30" fill="#FF48B0" opacity="0.95"/>
+<rect x="116" y="258" width="52" height="30" fill="#FF48B0" opacity="0.7"/>
+<rect x="180" y="258" width="52" height="30" fill="#FF48B0" opacity="0.95"/>
+<rect x="244" y="258" width="52" height="30" fill="#FF48B0" opacity="0.7"/>
+<rect x="308" y="258" width="52" height="30" fill="#FF48B0" opacity="0.95"/>
+<rect x="372" y="258" width="52" height="30" fill="#FF48B0" opacity="0.7"/>
+<rect x="436" y="258" width="52" height="30" fill="#FF48B0" opacity="0.95"/>
+<rect x="500" y="258" width="52" height="30" fill="#FF48B0" opacity="0.7"/>
+<rect x="52" y="302" width="52" height="30" fill="#FF48B0" opacity="0.7"/>
+<rect x="116" y="302" width="52" height="30" fill="#FF48B0" opacity="0.95"/>
+<rect x="180" y="302" width="52" height="30" fill="#FF48B0" opacity="0.7"/>
+<rect x="244" y="302" width="52" height="30" fill="#FF48B0" opacity="0.95"/>
+<rect x="308" y="302" width="52" height="30" fill="#FF48B0" opacity="0.7"/>
+<rect x="372" y="302" width="52" height="30" fill="#FF48B0" opacity="0.95"/>
+<rect x="436" y="302" width="52" height="30" fill="#FF48B0" opacity="0.7"/>
+<rect x="500" y="302" width="52" height="30" fill="#FF48B0" opacity="0.95"/>
+<rect x="166.9" y="176" width="22" height="34" fill="#FF48B0" transform="rotate(1.2 177.9 193)"/>
+<rect x="198.4" y="138" width="22" height="34" fill="#FF48B0" transform="rotate(2.9 209.4 155)"/>
+<rect x="231.5" y="100" width="22" height="34" fill="#FF48B0" transform="rotate(-12.2 242.5 117)"/>
+<rect x="254.2" y="170" width="22" height="34" fill="#FF48B0" transform="rotate(9.4 265.2 187)"/>
+<rect x="287.1" y="132" width="22" height="34" fill="#FF48B0" transform="rotate(-7.4 298.1 149)"/>
+<rect x="325.9" y="124" width="22" height="34" fill="#FF48B0" transform="rotate(-0.8 336.9 141)"/>
+<rect x="354" y="164" width="22" height="34" fill="#FF48B0" transform="rotate(-0.7 365 181)"/>
+<rect x="381.7" y="126" width="22" height="34" fill="#FF48B0" transform="rotate(-9.8 392.7 143)"/>
+<rect x="411.6" y="118" width="22" height="34" fill="#FF48B0" transform="rotate(10.3 422.6 135)"/>
+<rect x="44" y="352" width="512" height="104" fill="url(#gongzuo-dots-p)" opacity="0.9"/>
+<path d="M52 250H548L412 186V104H196V186Z" fill="url(#gongzuo-dots-p)"/>
+<path d="M196 104H412V186H196Z" fill="#FF48B0" opacity="0.6"/>
+<rect x="44" y="404" width="300" height="52" fill="#FF48B0" opacity="0.45"/>
+</g>
+<rect x="196" y="176" width="216" height="10" fill="#EEEFEA"/>
+<g fill="none" stroke="#1E2140" stroke-width="2">
+<path d="M44 220H556M44 340H556M44 466H556" stroke-dasharray="2 6"/>
+</g>
+<circle cx="78" cy="252" r="5" fill="#1E2140"/>
+<circle cx="142" cy="252" r="5" fill="#1E2140"/>
+<circle cx="206" cy="252" r="5" fill="#1E2140"/>
+<circle cx="270" cy="252" r="5" fill="#1E2140"/>
+<circle cx="334" cy="252" r="5" fill="#1E2140"/>
+<circle cx="398" cy="252" r="5" fill="#1E2140"/>
+<circle cx="462" cy="252" r="5" fill="#1E2140"/>
+<circle cx="526" cy="252" r="5" fill="#1E2140"/>
+<circle cx="78" cy="296" r="5" fill="#1E2140"/>
+<circle cx="142" cy="296" r="5" fill="#1E2140"/>
+<circle cx="206" cy="296" r="5" fill="#1E2140"/>
+<circle cx="270" cy="296" r="5" fill="#1E2140"/>
+<circle cx="334" cy="296" r="5" fill="#1E2140"/>
+<circle cx="398" cy="296" r="5" fill="#1E2140"/>
+<circle cx="462" cy="296" r="5" fill="#1E2140"/>
+<circle cx="526" cy="296" r="5" fill="#1E2140"/>
+<rect x="186" y="80" width="10" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="206" y="80" width="6" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="226" y="80" width="6" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="246" y="80" width="10" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="266" y="80" width="6" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="286" y="80" width="6" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="306" y="80" width="10" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="326" y="80" width="6" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="346" y="80" width="6" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="366" y="80" width="10" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="386" y="80" width="6" height="56" fill="#1E2140" opacity="0.85"/>
+<rect x="406" y="80" width="6" height="56" fill="#1E2140" opacity="0.85"/>
+<rect width="600" height="800" filter="url(#gongzuo-grain)" opacity="0.12"/>
+</svg>
