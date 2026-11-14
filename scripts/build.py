@@ -186,11 +186,15 @@ def cover_html(w, cls, width, height, alt=True, eager=False):
 
 # ---------------------------------------------------------------- body rendering
 def render_blocks(blocks, chapter_ids=True, note_prefix=None):
-    out, ch = [], 0
+    out, ch, pi = [], 0, 0
     for b in blocks:
         t = b.get("t")
         if t == "p":
-            out.append(f"<p>{inline(b['x'])}</p>")
+            if chapter_ids:  # 正文段落带稳定编号，供划线/笔记/段落分享定位
+                pi += 1
+                out.append(f'<p id="p-{pi}">{inline(b["x"])}</p>')
+            else:
+                out.append(f"<p>{inline(b['x'])}</p>")
         elif t == "h":
             if chapter_ids:
                 ch += 1
@@ -302,6 +306,24 @@ def og_image_tags(path):
     return (f'<meta property="og:image" content="{src}">\n'
             '<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n'
             f'<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:image" content="{src}">')
+
+
+EXTRA_ASSETS = ("reader.css", "reader.js", "share.css", "share.js", "vendor/qrcode.js")
+
+
+def extra_asset_tags():
+    """作品页额外资源：阅读增强（reader.*）与分享（share.*、vendor/qrcode.js）。源文件在 scripts/assets/，缺失则跳过。"""
+    tags = []
+    for name in EXTRA_ASSETS:
+        src = ROOT / "scripts" / "assets" / name
+        if not src.exists():
+            continue
+        data = src.read_bytes()
+        write(DIST / "assets" / name, data)
+        url = f"/assets/{name}?v={sha8(data)}"
+        tags.append(f'<link rel="stylesheet" href="{url}">' if name.endswith(".css")
+                    else f'<script src="{url}" defer></script>')
+    return "\n".join(tags)
 
 
 def shell(ctx, *, title, desc, path, page, body, body_attrs="", og_type="website", extra_head=""):
@@ -721,7 +743,23 @@ def build_work(ctx, meta, works, by_id, w):
     title = f"《{plain(w['title'])}》{w['author']}｜海豹杯 2026"
     write(DIST / "works" / wid / "index.html",
           shell(ctx, title=title, desc=desc, path=f"/works/{wid}/", page="work", body=body,
-                body_attrs=f' data-work="{wid}"', og_type="article"))
+                body_attrs=f' data-work="{wid}"', og_type="article",
+                extra_head=work_meta_json(w) + extra_asset_tags() + "\n"))
+
+
+def work_meta_json(w):
+    """供 reader.js / share.js 使用的作品元数据（type=application/json 不会执行，CSP 安全）。"""
+    data = {
+        "id": w["id"], "title": plain(w["title"]), "author": w["author"],
+        "url": f"{SITE}/works/{w['id']}/",
+        "cover": (w.get("cover") or {}).get("src"),
+        "juries": sorted({a["jury"] for a in w["awards"]}),
+        "awards": [award_full(a) for a in w["awards"]],
+        "chars": w["chars"],
+        "txt": f"/downloads/{w['id']}.txt", "epub": f"/downloads/{w['id']}.epub",
+    }
+    js = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    return f'<script type="application/json" id="work-meta">{js}</script>\n'
 
 
 # ---------------------------------------------------------------- favorites / 404
@@ -759,7 +797,7 @@ def build_404(ctx):
 
 # ---------------------------------------------------------------- static files
 def build_static(works):
-    csp = ("default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+    csp = ("default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; "
            f"script-src 'self' '{HEAD_JS_HASH}'; connect-src 'self'; font-src 'self'; "
            "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
     headers = f"""/*

@@ -254,17 +254,7 @@
     toggle(likeBtn, 'hb.liked', 'like', 'likes');
     toggle(favBtn, 'hb.faved', 'fav', 'favs', '已收藏，可在「我的收藏」里找到', '已取消收藏');
 
-    if (shareBtn) {
-      shareBtn.addEventListener('click', function () {
-        var url = location.origin + location.pathname;
-        var title = D.title;
-        if (navigator.share) {
-          navigator.share({ title: title, url: url }).catch(function () {});
-          return;
-        }
-        copyText(url).then(function () { toast('链接已复制'); }, function () { toast('复制失败，请手动复制地址栏链接', true); });
-      });
-    }
+    // 分享按钮由 share.js（window.HBShare）接管
 
     initReading(id);
     initTalk(id);
@@ -683,6 +673,9 @@
       dock.classList.toggle('is-tucked', es[0].isIntersecting && !open);
     }).observe(bar);
   }
+
+  // 共享给 reader.js / share.js 的工具（它们在 site.js 之后加载，均为 defer）
+  W.HB = { toast: toast, api: api, copyText: copyText, device: device, jget: jget, jset: jset, el: el, prefs: prefs, savePrefs: savePrefs };
 
   device();
   if (page === 'home') initHome();
