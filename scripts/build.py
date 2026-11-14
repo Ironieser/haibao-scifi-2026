@@ -124,6 +124,15 @@ def award_full(a):
     return a["jury_name"].replace("奖", "") + a["tier_name"]
 
 
+def award_tag(a):
+    """首页获奖标签：色块里写评审团（人 / AI），后面写奖级；鱼竿奖整块黄色。读屏读作「人类评委特别奖」。"""
+    if a["jury"] == "rod":
+        return '<span class="tg tg-r">鱼竿奖</span>'
+    j, short = ("h", "人") if a["jury"] == "human" else ("a", "AI")
+    return (f'<span class="tg tg-{j}"><b aria-hidden="true">{short}</b>'
+            f'<span class="sr">{esc(JURY_SHORT[a["jury"]])}</span>{esc(a["tier_name"])}</span>')
+
+
 def marks_html(w, cls="mark"):
     out = []
     for a in w["awards"]:
@@ -391,7 +400,7 @@ def footer(ctx):
 <blockquote><p>{esc(c['aiNote'])}</p></blockquote>
 <p class="foot-views" data-views-box hidden>全站累计浏览 <b data-views="total"></b> 次，今日 <b data-views="today-uv"></b> 位读者。<a href="/stats/">访问统计</a></p>
 <p>作品版权归作者所有，本站仅供阅读与交流。</p>
-<p>展示字体：得意黑（<a href="/assets/fonts/OFL.txt">OFL</a>）。</p>
+<p class="foot-font">展示字体：得意黑（<a href="/assets/fonts/OFL.txt">OFL</a>）。</p>
 <div class="theme-sw js-only" role="group" aria-label="外观"><span>外观</span>
 <button type="button" data-pref="theme" data-val="auto">跟随系统</button><button type="button" data-pref="theme" data-val="light">浅色</button><button type="button" data-pref="theme" data-val="dark">深色</button></div>
 </div></footer>"""
@@ -428,10 +437,17 @@ def duel_layout(meta, by_id):
     return human, ai, h_tiers, a_tiers, h_set, a_set
 
 
+def rod_ids(meta):
+    rod = next((j for j in meta["juries"] if j["id"] == "rod"), None)
+    return [w for t in rod["tiers"] for w in t["works"]] if rod else []
+
+
 def duel_svg(meta, by_id):
     human, ai, h_tiers, a_tiers, h_set, a_set = duel_layout(meta, by_id)
-    W_, ROW, GAP, TOP = 760, 34, 16, 86
-    XL_T, XL_D, XR_D, XR_T = 280, 292, 468, 480
+    rods = set(rod_ids(meta))
+    # 宽度 960：桌面上约 1:1.1 显示，与网格左对齐；中间留出连线区
+    W_, ROW, GAP, TOP = 960, 36, 18, 92
+    XL_T, XL_D, XR_D, XR_T = 384, 396, 564, 576
 
     def positions(tiers):
         pos, tier_spans, y = {}, [], TOP
@@ -446,23 +462,27 @@ def duel_svg(meta, by_id):
 
     hp, hspans, hy = positions(h_tiers)
     ap, aspans, ay = positions(a_tiers)
-    H_ = max(hy, ay) + 4
+    H_ = max(hy, ay) - GAP - ROW + 26
 
     parts = [f'<svg class="duel-svg" viewBox="0 0 {W_} {H_}" role="group" '
-             f'aria-labelledby="duel-h" aria-describedby="duel-desc">']
+             f'aria-labelledby="duel-h" aria-describedby="duel-desc">',
+             # 鱼竿奖：作品名下压一道黄色（滤镜按文字实际宽度铺色，与字体无关）
+             '<defs><filter id="d-rod-hl" x="-.06" y="-.1" width="1.12" height="1.3" primitiveUnits="objectBoundingBox">'
+             '<feFlood x="-.03" y=".8" width="1.06" height=".26" flood-color="#FFE800" result="f"/>'
+             '<feMerge><feMergeNode in="f"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>']
     # 列标题
     parts.append(f'<text class="d-col" x="{XL_T}" y="30" text-anchor="end">人类评委</text>')
-    parts.append(f'<text class="d-col-sub" x="{XL_T}" y="52" text-anchor="end">{len(h_set)} 部作品，奖金 {money(human["sum"])} 元</text>')
+    parts.append(f'<text class="d-col-sub" x="{XL_T}" y="54" text-anchor="end">{len(h_set)} 部作品，奖金 {money(human["sum"])} 元</text>')
     parts.append(f'<text class="d-col" x="{XR_T}" y="30">AI评委</text>')
-    parts.append(f'<text class="d-col-sub" x="{XR_T}" y="52">{len(a_set)} 部作品，奖金 {money(ai["sum"])} 元</text>')
-    parts.append(f'<line class="d-rule" x1="0" x2="{W_}" y1="64" y2="64"/>')
+    parts.append(f'<text class="d-col-sub" x="{XR_T}" y="54">{len(a_set)} 部作品，奖金 {money(ai["sum"])} 元</text>')
+    parts.append(f'<line class="d-rule" x1="0" x2="{W_}" y1="68" y2="68"/>')
 
     def tier_label(t, y0, y1, side):
         prize = ("各 " if t["each"] else "") + money(t["prize"]) + " 元"
         if side == "L":
-            x, anchor, bx = 0, "start", 100
+            x, anchor, bx = 0, "start", 104
         else:
-            x, anchor, bx = W_, "end", W_ - 100
+            x, anchor, bx = W_, "end", W_ - 104
         out = [f'<text class="d-tier" x="{x}" y="{y0 + 2}" text-anchor="{anchor}">{esc(t["name"])}</text>',
                f'<text class="d-prize" x="{x}" y="{y0 + 19}" text-anchor="{anchor}">{esc(prize)}</text>']
         if y1 > y0:
@@ -491,15 +511,16 @@ def duel_svg(meta, by_id):
             # 套印的轻微错位：蓝版相对粉版偏 2.2px
             d2 = f"M{x1} {y1 + 2.2} C{mx} {y1 + 2.2} {mx} {y2 + 2.2} {x2} {y2 + 2.2}"
             g.append(f'<path class="d-ln d-ln-h" d="{d}"/><path class="d-ln d-ln-a" d="{d2}"/>')
+        rod = ' filter="url(#d-rod-hl)"' if wid in rods else ""
         if wid in hp:
             y = hp[wid]
-            g.append(f'<rect class="d-hit" x="104" y="{y - 15}" width="{XL_D - 98}" height="30"/>')
-            g.append(f'<text class="d-t" x="{XL_T}" y="{y}" dy=".36em" text-anchor="end">{esc(w["title"])}</text>')
+            g.append(f'<rect class="d-hit" x="112" y="{y - 16}" width="{XL_D + 6 - 112}" height="32"/>')
+            g.append(f'<text class="d-t" x="{XL_T}" y="{y}" dy=".36em" text-anchor="end"{rod}>{esc(w["title"])}</text>')
             g.append(f'<circle class="d-h" cx="{XL_D}" cy="{y}" r="5.5"/>')
         if wid in ap:
             y = ap[wid]
-            g.append(f'<rect class="d-hit" x="{XR_D - 8}" y="{y - 15}" width="{W_ - 104 - XR_D + 8}" height="30"/>')
-            g.append(f'<text class="d-t" x="{XR_T}" y="{y}" dy=".36em">{esc(w["title"])}</text>')
+            g.append(f'<rect class="d-hit" x="{XR_D - 6}" y="{y - 16}" width="{W_ - 112 - XR_D + 6}" height="32"/>')
+            g.append(f'<text class="d-t" x="{XR_T}" y="{y}" dy=".36em"{rod}>{esc(w["title"])}</text>')
             g.append(f'<circle class="d-a" cx="{XR_D}" cy="{y}" r="5.5"/>')
         g.append("</a>")
         links.append("".join(g))
@@ -518,14 +539,13 @@ def duel_list(meta, by_id):
 
     def row(wid):
         w = by_id[wid]
-        ms = "".join(
-            f'<span class="mark mark-{JURY_MARK[a["jury"]]}">{esc(JURY_SHORT[a["jury"]])}{esc(a["tier_name"])}</span>'
-            for a in w["awards"] if a["jury"] in ("human", "ai"))
+        # 奖级与奖金都写成文字，颜色只是辅助（WCAG 1.4.1）
+        ms = "".join(f'<li>{award_tag(a)}<span class="dl-p">{money(a["prize"])} 元</span></li>' for a in w["awards"])
         return (f'<li><a href="/works/{wid}/"><span class="t">{esc(w["title"])}</span>'
-                f'<span class="r">{ms}</span></a></li>')
+                f'<ul class="r">{ms}</ul></a></li>')
 
     def group(title, dot, ws):
-        return (f'<li class="duel-group"><h3>{dot}{esc(title)}<span class="mark">{len(ws)} 部</span></h3>'
+        return (f'<li class="duel-group"><h3>{dot}{esc(title)}<span class="n">{len(ws)} 部</span></h3>'
                 f'<ol>{"".join(row(w) for w in ws)}</ol></li>')
 
     return ('<ol class="duel-list">'
@@ -536,93 +556,172 @@ def duel_list(meta, by_id):
 
 
 # ---------------------------------------------------------------- home
+BILI_RULES = "https://www.bilibili.com/video/BV1c2Ngz8Emd/"
+
+
+def zip_size_label():
+    """打包文件的实际大小（export.py 的产物；首次构建时可能还不存在）。"""
+    z = DIST / "downloads" / "haibao2026-all.zip"
+    if not z.exists():
+        return ""
+    return f"，约 {z.stat().st_size / 1_000_000:.1f} MB"
+
+
+def pow2(n):
+    e = n.bit_length() - 1
+    return e if n == 1 << e else None
+
+
+def home_facts(meta, works, by_id, n_both, n_h, n_a):
+    """紧跟首屏的四格：每格一幅小图 + 一句话。图本身就是数据，不做装饰。"""
+    ai = next(j for j in meta["juries"] if j["id"] == "ai")
+    rods = rod_ids(meta)
+    rod_tier = next(j for j in meta["juries"] if j["id"] == "rod")["tiers"][0]
+    noai = [w for w in works if not w["ai"]]
+    n_ai = len(works) - len(noai)
+
+    # 1. 两份名单的重合：真正叠印出来的维恩图
+    venn = (f'<svg class="f-venn" viewBox="0 0 200 92" role="img" '
+            f'aria-label="只获人类评委奖 {n_h} 部，两边都获奖 {n_both} 部，只获 AI 评委奖 {n_a} 部">'
+            '<text class="f-lb" x="56" y="11" text-anchor="middle">人类评委</text>'
+            '<text class="f-lb" x="144" y="11" text-anchor="middle">AI 评委</text>'
+            '<circle class="f-h" cx="78" cy="56" r="35"/><circle class="f-a" cx="122" cy="56" r="35"/>'
+            f'<text class="f-n" x="58" y="56" dy=".35em" text-anchor="middle">{n_h}</text>'
+            f'<text class="f-n" x="100" y="56" dy=".35em" text-anchor="middle">{n_both}</text>'
+            f'<text class="f-n" x="142" y="56" dy=".35em" text-anchor="middle">{n_a}</text></svg>')
+
+    # 2. AI 评委奖金：逐级减半的条
+    top = max(t["prize"] for t in ai["tiers"])
+    bars = []
+    for t in ai["tiers"]:
+        e = pow2(t["prize"])
+        expo = f' = 2<sup>{e}</sup>' if e is not None else ""
+        bars.append(f'<li><span class="b-k">{esc(t["name"])}</span>'
+                    f'<i style="--w:{t["prize"] / top * 100:.2f}%" aria-hidden="true"></i>'
+                    f'<span class="b-v">{t["prize"]}{expo}</span></li>')
+    bars_html = f'<ol class="f-bars">{"".join(bars)}</ol>'
+
+    # 3. 鱼竿奖作品：与对照图同样的黄线
+    rod_html = ('<ul class="f-rod">' + "".join(
+        f'<li><a href="/works/{wid}/">{esc(by_id[wid]["title"])}</a></li>' for wid in rods) + "</ul>")
+
+    # 4. 18 格：实心 = 使用或声称使用 AI，空心 = 未使用
+    cells = "".join('<i class="on"></i>' for _ in range(n_ai)) + "".join("<i></i>" for _ in noai)
+    dots = (f'<p class="f-dots" role="img" aria-label="{len(works)} 部中 {n_ai} 部使用或声称使用 AI，'
+            f'{len(noai)} 部未使用">{cells}</p>')
+    noai_txt = "".join(f'<a href="/works/{w["id"]}/">《{esc(w["title"])}》</a>' for w in noai)
+
+    def cell(cls, fig, h, p):
+        return (f'<li class="fact {cls}"><div class="f-fig">{fig}</div>'
+                f'<h3>{h}</h3><p>{p}</p></li>')
+
+    return ('<section class="facts wrap" aria-label="这次评奖的几个特别之处"><ul class="facts-in">'
+            + cell("fact-both", venn, f"两份名单只重合 {n_both} 部",
+                   "同一批稿子，人类评委与 AI 评委的选择差别很大。")
+            + cell("fact-pow", bars_html, "AI 评委的奖金是 2 的幂",
+                   "从特别奖到三等奖，每降一级正好减半。")
+            + cell("fact-rod", rod_html, "鱼竿奖：授人以渔",
+                   f"奖励能教会后来者的 AI 写作方法，获奖作品附创作说明。{len(rods)} 部，"
+                   f"各 {money(rod_tier['prize'])} 元。")
+            + cell("fact-ai", dots, f"{len(works)} 部中 {n_ai} 部用了 AI",
+                   f"未使用 AI 的 {len(noai)} 部：{noai_txt}")
+            + "</ul></section>")
+
+
+def book_html(w):
+    tags = "".join(award_tag(a) for a in w["awards"])
+    if not w["ai"]:
+        tags += '<span class="tg tg-n">未用 AI</span>'
+    js = {a["jury"] for a in w["awards"]}
+    return (f'<li class="book" data-id="{w["id"]}" data-order="{w["order"]}" data-chars="{w["chars"]}" '
+            f'data-both="{1 if w["both"] else 0}" data-ai="{1 if w["ai"] else 0}" data-rod="{1 if "rod" in js else 0}">'
+            f'<a href="/works/{w["id"]}/">{cover_html(w, "b-cv", 240, 320, alt=False)}'
+            f'<span class="b-t">{esc(w["title"])}</span><span class="b-a">{esc(w["author"])}</span>'
+            f'<span class="b-tags">{tags}</span>'
+            f'<span class="b-meta"><span>{fmt_chars(w["chars"])}</span>'
+            f'<span data-views-box hidden>阅读 <b data-views-page="{w["id"]}"></b></span>'
+            f'<span data-stat="likes" hidden>赞 <b class="n"></b></span>'
+            f'<span data-stat="comments" hidden>评论 <b class="n"></b></span></span>'
+            f"</a></li>")
+
+
 def build_home(ctx, meta, works, by_id, hero_art=None):
     c = meta["contest"]
     total = meta["total_prize"]
     first = by_id["huidao-mingtian"]
     svg = duel_svg(meta, by_id)
-    hero_img = ""
-    if hero_art:
-        hero_img = (f'<img class="hero-art" src="{esc(hero_art["src"])}" alt="{esc(hero_art["alt"])}" '
-                    f'width="1200" height="800" decoding="async" fetchpriority="high">')
     mlist, n_both, n_h, n_a = duel_list(meta, by_id)
+    rods = rod_ids(meta)
+    rod_tier = next(j for j in meta["juries"] if j["id"] == "rod")["tiers"][0]
+    t = datetime.fromisoformat(c["announcedAt"])
+    when = f"{t.year} 年 {t.month} 月 {t.day} 日 {t:%H:%M}"
 
-    # 获奖名单
-    jury_html = []
-    for j in meta["juries"]:
-        tiers = []
-        for t in j["tiers"]:
-            prize = ("奖金各 " if t["each"] else "奖金 ") + money(t["prize"]) + " 元"
-            items = "".join(
-                f'<li><a href="/works/{wid}/"><span class="wt">《{esc(by_id[wid]["title"])}》</span>'
-                f'<span class="wa">{esc(by_id[wid]["author"])}</span></a></li>' for wid in t["works"])
-            name = t["name"] if t["name"] != j["name"] else f'{len(t["works"])} 部作品'
-            tiers.append(f'<div class="tier"><div class="tier-h"><h4>{esc(name)}</h4><span>{esc(prize)}</span></div>'
-                         f"<ul>{items}</ul></div>")
-        jury_html.append(f'<section class="jury jury-{j["id"]}" aria-labelledby="jury-{j["id"]}">'
-                         f'<h3 id="jury-{j["id"]}">{esc(j["name"])}</h3>'
-                         f'<p class="jury-sum">奖金合计 {money(j["sum"])} 元</p>{"".join(tiers)}</section>')
+    hero_fig = ""
+    if hero_art:
+        hero_fig = (f'<div class="hero-fig"><img class="hero-art" src="{esc(hero_art["src"])}" alt="{esc(hero_art["alt"])}" '
+                    f'width="1200" height="800" decoding="async" fetchpriority="high"></div>')
 
-    # 全部作品
-    rows = []
-    for w in works:
-        ai_txt = "AI 辅助" if w["ai"] else "未用 AI"
-        rows.append(
-            f'<li class="wrow" data-id="{w["id"]}" data-order="{w["order"]}" data-chars="{w["chars"]}" '
-            f'data-both="{1 if w["both"] else 0}" data-ai="{1 if w["ai"] else 0}">'
-            f'<a href="/works/{w["id"]}/">{cover_html(w, "w-cv", 72, 96, alt=False)}<span class="w-body">'
-            f'<span class="w-tt"><span class="w-t">{esc(w["title"])}</span><span class="w-a">{esc(w["author"])}</span></span>'
-            f'<span class="w-aw">{marks_html(w)}</span>'
-            f'<span class="w-ch">{fmt_chars(w["chars"])}</span>'
-            f'<span class="w-ai{"" if w["ai"] else " no"}">{ai_txt}</span>'
-            f'<span class="w-st n" data-stat="likes" hidden><span class="n">0</span><span class="u"> 赞</span></span>'
-            f'<span class="w-st n" data-stat="comments" hidden><span class="n">0</span><span class="u"> 评论</span></span>'
-            f"</span></a></li>")
+    rod_line = "".join(f'《<a href="/works/{wid}/">{esc(by_id[wid]["title"])}</a>》' for wid in rods)
+    shelf = "\n".join(book_html(w) for w in works)
+    bili = f'href="{BILI_RULES}" target="_blank" rel="noopener"'
 
     body = f"""<main id="main">
 <section class="hero wrap{' has-art' if hero_art else ''}" aria-labelledby="hero-h">
-{hero_img}<div class="hero-text"><div id="hero-h">{ovp(["海豹杯", "科幻文学大赛"])}</div>
-<p class="hero-lede">{c['year']} 年获奖作品集，<b>{len(works)}</b> 部作品，两个评审团，奖金合计 <b>{money(total)}</b> 元。</p>
+<div class="hero-text">
+<p class="hero-from"><span>《睡前消息》马督工发起的海豹奖科幻小说征文赛，第 0 届。</span><span><a {bili}>规则<span class="sr">（B 站视频，在新窗口打开）</span></a>发布于节目第 1026 期。</span></p>
+<div id="hero-h">{ovp(["海豹杯", "科幻文学大赛"])}</div>
+<p class="hero-lede">同一批小说，人类和 AI 各评一次。<span class="l2"><b>{len(works)}</b> 部获奖，奖金合计 <b>{money(total)}</b> 元。</span></p>
 <div class="hero-actions">
 <a class="btn btn-primary" href="/works/{first['id']}/">阅读特别奖《{esc(first['title'])}》</a>
-<a class="btn" href="#awards">查看获奖名单</a>
-</div></div>
+<a class="btn" href="/downloads/haibao2026-all.zip" download>{ICON['down']}打包下载全部作品（TXT + EPUB{zip_size_label()}）</a>
+</div>
+<p class="hero-views" data-views-box hidden>累计浏览 <b data-views="total"></b> 次，今日 <b data-views="today-uv"></b> 位读者。<a href="/stats/">访问统计</a></p>
+</div>
+{hero_fig}
 </section>
 
-<section class="sec wrap" id="duel" aria-labelledby="duel-h">
+{home_facts(meta, works, by_id, n_both, n_h, n_a)}
+
+<section class="sec wrap" id="awards" aria-labelledby="duel-h">
 <h2 class="sec-h" id="duel-h">两份名单</h2>
-<p class="sec-intro" id="duel-desc">左边是<span class="k-h">人类评委</span>的名次，右边是 <span class="k-a">AI 评委</span>的名次。两边都选中的 {n_both} 部作品连成一线，粉与蓝叠印成紫；只被一边选中的作品单独列出（人类评委 {n_h} 部，AI 评委 {n_a} 部）。同一奖级内不分先后。</p>
+<p class="sec-intro" id="duel-desc">左边是<span class="k-h">人类评委</span>的名次，右边是 <span class="k-a">AI 评委</span>的名次，同一奖级内不分先后。两边都选中的 {n_both} 部连成一线，粉与蓝叠印成紫；只被一边选中的：人类评委 {n_h} 部，AI 评委 {n_a} 部。作品名下的黄线表示另获鱼竿奖。</p>
 <figure class="duel">
 {svg}
-<figcaption class="duel-cap"><span><i class="sw sw-both" aria-hidden="true"></i>两边都获奖</span><span><i class="sw sw-h" aria-hidden="true"></i>人类评委</span><span><i class="sw sw-a" aria-hidden="true"></i>AI 评委</span><span>点击作品名进入阅读</span></figcaption>
 {mlist}
+<figcaption class="duel-cap"><span class="duel-key"><span><i class="sw sw-both" aria-hidden="true"></i>两边都获奖</span><span><i class="sw sw-h" aria-hidden="true"></i>人类评委</span><span><i class="sw sw-a" aria-hidden="true"></i>AI 评委</span><span><i class="sw sw-r" aria-hidden="true"></i>鱼竿奖</span></span>
+<span class="duel-rod">鱼竿奖（各 {money(rod_tier['prize'])} 元）：{rod_line}</span></figcaption>
 </figure>
-</section>
-
-<section class="sec wrap" id="awards" aria-labelledby="awards-h">
-<h2 class="sec-h" id="awards-h">获奖名单</h2>
-<div class="juries">
-{"".join(jury_html)}
-</div>
 </section>
 
 <section class="sec wrap" id="works" aria-labelledby="works-h">
 <h2 class="sec-h" id="works-h">全部作品</h2>
-<div class="works-bar">
-<div class="works-tools js-only">
+<div class="works-bar js-only">
 <div class="seg" role="group" aria-label="筛选">
-<button type="button" data-filter="all" aria-pressed="true">全部</button><button type="button" data-filter="both" aria-pressed="false">两个评审团都获奖</button><button type="button" data-filter="noai" aria-pressed="false">未使用 AI</button>
+<button type="button" data-filter="all" aria-pressed="true">全部</button><button type="button" data-filter="both" aria-pressed="false">两边都获奖</button><button type="button" data-filter="rod" aria-pressed="false">鱼竿奖</button><button type="button" data-filter="noai" aria-pressed="false">未用 AI</button>
 </div>
-<label class="sorter">排序 <select id="sort"><option value="award">默认（按奖项）</option><option value="likes">最多点赞</option><option value="chars">字数</option></select></label>
+<label class="sorter">排序<select id="sort"><option value="award">按奖项</option><option value="views">最多阅读</option><option value="likes">最多点赞</option><option value="short">篇幅最短</option><option value="long">篇幅最长</option></select></label>
+<p class="shelf-count" id="shelf-count" aria-live="polite"></p>
 </div>
-<a class="dl-all act" href="/downloads/haibao2026-all.zip" download>{ICON['down']}打包下载全部作品（ZIP）</a>
-</div>
-<div class="wl-head" aria-hidden="true"><span></span><span>作品</span><span>获奖</span><span>字数</span><span>AI</span><span class="n" data-stat hidden>点赞</span><span class="n" data-stat hidden>评论</span></div>
-<ol class="wl" id="wl">
-{chr(10).join(rows)}
+<ol class="shelf" id="shelf">
+{shelf}
 </ol>
-<p class="wl-empty" id="wl-empty" hidden>没有符合条件的作品。</p>
-<p class="sec-intro js-only" id="wl-count" aria-live="polite"></p>
+<p class="shelf-empty" id="shelf-empty" hidden>没有符合条件的作品。</p>
+</section>
+
+<section class="sec wrap" id="recent" aria-labelledby="recent-h" hidden>
+<h2 class="sec-h" id="recent-h">最新讨论</h2>
+<ol class="recent" id="recent-list"></ol>
+</section>
+
+<section class="sec wrap about" id="about" aria-labelledby="about-h">
+<h2 class="sec-h" id="about-h">关于这次征文</h2>
+<div class="about-in">
+<div class="about-text">
+<p>海豹奖科幻小说征文赛（第 0 届）由《{esc(c['host'])}》主持人{esc(c['announcedBy'])}发起，规则发布于节目第 1026 期（2026 年 3 月 8 日，<a {bili}>B 站视频<span class="sr">，在新窗口打开</span></a>）。征文鼓励用 AI 辅助写作，评出人类评委奖与 AI 评委奖两份名单；鱼竿奖奖励对后来者有指导作用的 AI 创作方法，获奖作品附创作说明。</p>
+<p>获奖名单由{esc(c['announcedBy'])}于 {esc(when)} 发布，原题「{esc(c['name'])}获奖名单」，本站沿用「海豹杯」这个名字。</p>
+</div>
+<figure class="about-note"><blockquote><p>{esc(c['aiNote'])}</p></blockquote><figcaption>名单中关于 AI 辅助的说明</figcaption></figure>
+</div>
 </section>
 </main>"""
     desc = (f"{c['name']}获奖作品集：{len(works)} 部作品，人类评委与 AI 评委两份名单，奖金合计 {money(total)} 元。在线阅读、下载与讨论。")

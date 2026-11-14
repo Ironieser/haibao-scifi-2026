@@ -40,8 +40,14 @@ def warn(msg):
     print("  ! " + msg)
 
 
-RADICALS = str.maketrans("⻄⻅⻔⻛⻓⻮⻢⻥⻚⻜⻩⻬⻆⻨⻝⻘⻰⻳⻋⻉⻊⻌⻍⻎⻏⻐⻑⻒⻕⻖⻗⻘⻙⻞⻟⻠⻡⻣⻤⻦⻧⻪⻫⻭⻯⻱⻲",
-                         "西见门风长齿马鱼页飞黄齐角麦食青龙龟车贝⻊辶辶辶辶⻐⻑⻒⻕⻖⻗青⻙⻞⻟⻠⻡⻣⻤⻦⻧⻪⻫⻭⻯⻱⻲")
+# CJK 部首补充区（⻅ ⻔ …）没有 NFKC 分解，按简体字形对照；康熙部首区（⼀ ⽰）用 NFKC，
+# 个别 NFKC 得到繁体的（⼾ -> 戶）改为简体。PDF 字体 cmap 偶见的异体（㬵）也一并归一。
+RADICALS = str.maketrans({
+    "⺟": "母", "⺠": "民", "⻄": "西", "⻅": "见", "⻆": "角", "⻋": "车", "⻉": "贝", "⻓": "长",
+    "⻔": "门", "⻘": "青", "⻙": "韦", "⻚": "页", "⻛": "风", "⻜": "飞", "⻝": "食", "⻢": "马",
+    "⻣": "骨", "⻤": "鬼", "⻥": "鱼", "⻦": "鸟", "⻨": "麦", "⻩": "黄", "⻬": "齐", "⻮": "齿",
+    "⻰": "龙", "⻳": "龟", "⼾": "户", "\u3b35": "胶",
+})
 
 TAB = "\x01"      # 段内制表符 -> 两个全角空格
 MISSING = "\ufffd"  # PDF 中无 Unicode 映射的字形（由 clean.py 按上下文补字）
@@ -165,11 +171,17 @@ def mkblock(t, x, m=None, **kw):
     return b
 
 
+EDGE_PUNCT = "“”\"‘’'「」『』（）()《》【】[]。，、！？!?：:；;…—- \u3000"
+
+
 def full_kinds(b):
-    """整段覆盖的格式集合。"""
+    """整段覆盖的格式集合（首尾标点不计）。"""
     x = b.get("x", "")
-    n = len(x.strip())
-    return {k for s, e, k in b.get("m", []) if s == 0 and e >= len(x) and n}
+    a = len(x) - len(x.lstrip(EDGE_PUNCT))
+    z = len(x.rstrip(EDGE_PUNCT))
+    if z <= a:
+        a, z = 0, len(x)
+    return {k for s, e, k in b.get("m", []) if s <= a and e >= z}
 
 
 def drop_kinds(b, kinds):
@@ -199,14 +211,18 @@ HEAD_RE = re.compile(
 )
 RULE_RE = re.compile(r"^[*＊·•※\-—_~～=─━]+( ?[*＊·•※\-—_~～=─━]+)*$")
 MD_HEAD_RE = re.compile(r"^#{1,6}\s+")
-MD_LI_RE = re.compile(r"^([-*•●▪◦]|\d{1,2}[.)])\s+")
+MD_LI_RE = re.compile(r"^(?:([-*])\s+|([•●▪◦])\s*)")
 DIALOG_RE = re.compile(r"^\d+\s*[.．、]\s*(我|Claude\d*|ChatGPT|Gemini|DeepSeek|豆包|AI)\s*[：:]?$", re.I)
 
 
 def looks_heading(x: str) -> bool:
-    if x.endswith(("：", ":")) or DIALOG_RE.match(x):
+    mt = HEAD_RE.match(x)
+    if not mt or len(x) > 30 or DIALOG_RE.match(x) or re.search(r"[。！？]|[，、]$", x):
         return False
-    return len(x) <= 30 and bool(HEAD_RE.match(x)) and not re.search(r"[。！？]|[，、]$", x)
+    # 以冒号结尾、且编号之后还有内容的是字段标签/对话标签（“1.Claude：”），不是标题；“一：”“第五章：”仍是标题
+    if x.endswith(("：", ":")) and len(x[mt.end():].rstrip("：:")) > 0:
+        return False
+    return True
 
 
 def strip_prefix(b, n):
@@ -226,18 +242,17 @@ def md_line(b):
     """Markdown 行首记号：# 标题、- 列表。"""
     x = b["x"]
     mt = MD_HEAD_RE.match(x)
-    if mt:
+    if mt and "b" not in full_kinds(b) and len(x) <= 40:  # “**# 系统输出……**”不是标题
         strip_prefix(b, mt.end())
         b["t"] = "h"
         drop_kinds(b, {"b"})
         return b
     mt = MD_LI_RE.match(x)
-    if mt and b["t"] == "p" and len(x) > mt.end():
-        mk = mt.group(1)
+    if mt and b["t"] == "p" and len(x) > mt.end() and not RULE_RE.match(x):
         strip_prefix(b, mt.end())
         b["t"] = "li"
         b["lvl"] = 0
-        b["mk"] = mk if re.match(r"\d", mk) else "•"
+        b["mk"] = "•"
     return b
 
 
@@ -757,8 +772,6 @@ def convert_docx(path: Path, ctx):
         final.append(b)
     while final and final[-1]["t"] == "hr" and final[-1].get("_src") == "empty":
         final.pop()
-    for b in final:
-        b.pop("_src", None)
     return classify_docx(final, ctx)
 
 
@@ -822,56 +835,90 @@ FANGSONG = re.compile(r"仿宋|FangSong|STFangsong", re.I)
 
 
 def classify_docx(blocks, ctx):
-    """整段格式 -> cls / 整段 m。"""
+    """整段格式 -> cls：letter / doc / box / epi / alt。"""
     main_font = ctx.get("main_font") or ""
     n = len(blocks)
-    # 第一遍：逐段候选
     for b in blocks:
         meta = b.get("_meta")
-        if not meta or b["t"] not in ("p", "c", "li"):
+        if not meta or b["t"] not in ("p", "c", "li", "h"):
             continue
         full = full_kinds(b)
         ck = color_kind(meta["color"])
         font = meta["font"]
-        meta["alt"] = bool(font) and font != main_font and meta["n"] >= 2 and font not in ("", None)
+        meta["alt"] = bool(font) and font != main_font and meta["n"] >= 2
+        meta["gray"] = ck == "gray"
+        if b["t"] == "h":
+            continue
         if "i" in full and ck == "color":
-            b["cls"] = "letter"
+            b["cls"] = "letter"          # 彩色整段斜体：书信
             drop_kinds(b, {"i"})
         elif "u" in full and "i" not in full and len(b["x"]) >= 2:
-            b["cls"] = "doc"
+            b["cls"] = "doc"             # 整段下划线：公文/病例引文
             drop_kinds(b, {"u"})
-        meta["gray"] = ck == "gray"
-    # 第二遍：成组的字体区块
+    # 异体字体区：同一非主字体的连续段落（中间可隔 hr / 表格 / 同字体标题）
     i = 0
     while i < n:
-        b = blocks[i]
-        meta = b.get("_meta")
-        if not meta or not meta.get("alt") or b.get("cls") or b["t"] == "h":
+        meta = blocks[i].get("_meta")
+        if not meta or not meta.get("alt") or blocks[i].get("cls"):
             i += 1
             continue
-        j = i
         font = meta["font"]
-        while j < n and blocks[j].get("_meta", {}).get("font") == font and blocks[j]["t"] != "h" \
-                and not blocks[j].get("cls") and blocks[j].get("_meta", {}).get("alt"):
-            j += 1
-        group = blocks[i:j]
-        if FANGSONG.search(font or "") and len(group) >= 3:
+        members = [i]
+        j = i + 1
+        while j < n:
+            bj = blocks[j]
+            mj = bj.get("_meta")
+            if mj is None and bj["t"] in ("hr", "table"):
+                j += 1
+                continue
+            if mj and mj.get("alt") and mj["font"] == font and not bj.get("cls"):
+                members.append(j)
+                j += 1
+                continue
+            break
+        last = members[-1]
+        text_members = [k for k in members if blocks[k]["t"] != "h"]
+        if FANGSONG.search(font or "") and len(text_members) >= 3:
             cls = "box"
-        elif all(g.get("_meta", {}).get("gray") for g in group) and i < 12:
+            first = i
+            # 区块标题（如“[内部文档 · …]”）常用另一种字体，紧邻时一并纳入
+            k = i - 1
+            while k >= 0 and i - k <= 3:
+                mk_ = blocks[k].get("_meta")
+                if blocks[k]["t"] == "hr":
+                    k -= 1
+                    continue
+                if mk_ and mk_.get("alt") and len(blocks[k].get("x", "")) <= 40:
+                    first = k
+                    k -= 1
+                    continue
+                break
+            span = range(first, last + 1)
+        elif all(blocks[k]["_meta"].get("gray") for k in members) and i < 15:
             cls = "epi"
+            span = text_members
         else:
             cls = "alt"
-        for g in group:
-            g["cls"] = cls
-        i = j
+            span = text_members
+        for k in span:
+            if cls == "box" or blocks[k]["t"] != "h":
+                blocks[k]["cls"] = cls
+        i = last + 1
     # 题记：卷首连续灰字段
-    for i, b in enumerate(blocks[:15]):
+    for b in blocks[:15]:
         meta = b.get("_meta")
         if meta and meta.get("gray") and b["t"] in ("p", "c") and not b.get("cls"):
             b["cls"] = "epi"
-    for b in blocks:
+    # 区块内部的空段只是段距，不是分场
+    out = []
+    for k, b in enumerate(blocks):
+        if b["t"] == "hr" and b.get("_src") == "empty" and b.get("cls") == "box":
+            continue
+        out.append(b)
+    for b in out:
         b.pop("_meta", None)
-    return blocks
+        b.pop("_src", None)
+    return out
 
 
 # ---------------- pdf ----------------
@@ -1005,42 +1052,68 @@ class Line:
         self.text = None
 
     def build(self, code_rects=()):
-        """拼接行文本：-> [(text, fmt)]。"""
+        """拼接行文本 -> [(text, fmt)]；标出行内灰框（code），检测无映射字形留下的空隙。"""
         segs = []
         prev = None
         for f in self.frags:
-            t = f.text
             fmt = set()
             if f.b:
                 fmt.add("b")
             if f.i:
                 fmt.add("i")
-            cx = (f.x0 + f.x1) / 2
-            for (rx0, ry0, rx1, ry1) in code_rects:
-                if rx0 - 1 <= cx <= rx1 + 1 and ry0 - 2 <= (f.top + f.bot) / 2 <= ry1 + 2:
-                    fmt.add("code")
-            if prev is not None:
+            rects = [r for r in code_rects if r[0] - 1 < f.x1 and r[2] + 1 > f.x0
+                     and r[1] - 2 <= (f.top + f.bot) / 2 <= r[3] + 2]
+            if prev is not None and segs:
                 gap = f.x0 - prev.x1
-                pt = segs[-1][0] if segs else ""
+                pt = segs[-1][0]
+                t = f.text
                 if pt and t:
-                    a, b = pt.rstrip()[-1:] or " ", t.lstrip()[:1] or " "
-                    if gap > 0.5 * f.size and is_cjkp(a) and is_cjkp(b) and not pt.endswith(" ") and not t.startswith(" "):
+                    a, b = pt[-1], t[0]
+                    near_rect = any(abs(f.x0 - r[0]) < f.size or abs(prev.x1 - r[2]) < f.size for r in code_rects)
+                    if gap > 0.5 * f.size and is_cjkp(a) and is_cjkp(b) and not near_rect and not self.code:
                         segs.append((MISSING, set()))
-                    elif gap > 0.15 * f.size and re.match(r"[A-Za-z0-9,.:;!?)%]", a) and re.match(r"[A-Za-z0-9(]", b) \
-                            and not pt.endswith(" ") and not t.startswith(" "):
+                    elif gap > 0.15 * f.size and re.match(r"[A-Za-z0-9,.:;!?)%]", a) and re.match(r"[A-Za-z0-9(]", b):
                         segs.append((" ", set()))
-            segs.append((t, fmt))
+            # 逐字估算横坐标：汉字/全角 1em，其余 0.5em，按片段宽度缩放
+            t = f.text
+            ws = [1.0 if (is_cjkp(c) and c not in "“”‘’") else 0.5 for c in t]
+            tot = sum(ws) or 1
+            scale = (f.x1 - f.x0) / tot
+            pos = f.x0
+            for k, c in enumerate(t):
+                cx = pos + ws[k] * scale / 2
+                pos += ws[k] * scale
+                cf = set(fmt)
+                in_rect = any(r[0] - 1 <= cx <= r[2] + 1 for r in rects)
+                if in_rect:
+                    cf.add("code")
+                if c == " " and not self.code and 0 < k < len(t) - 1 and is_cjkp(t[k - 1]) and is_cjkp(t[k + 1]):
+                    edge = any(abs(cx - r[0]) < 1.2 * f.size or abs(cx - r[2]) < 1.2 * f.size for r in rects)
+                    if edge:
+                        continue  # 灰框内边距
+                    if t[k - 1] not in "“”‘’" and t[k + 1] not in "“”‘’":
+                        c = MISSING
+                elif c == " " and not self.code and rects and (k == 0 or k == len(t) - 1):
+                    continue
+                elif c == " " and not self.code and k == 0 and len(t) > 1 and is_cjkp(t[1]) \
+                        and segs and is_cjkp(segs[-1][0][-1:] or " ") and f.x0 - (prev.x1 if prev else f.x0) < 0.5 * f.size:
+                    continue  # 片段开头多出的空格（两侧都是汉字、实际并无空隙）
+                segs.append((c, cf))
             prev = f
-        # 片段内部：汉字 + 空格 + 汉字（pdftohtml 用空格代替了无映射字形）
-        fixed = []
-        for t, fmt in segs:
-            if not self.code:
-                t = re.sub(r"(?<=[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef“”…])  ?(?=[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef“”…])",
-                           MISSING, t)
-            fixed.append((t, fmt))
-        self.segs = fixed
-        self.text = "".join(t for t, _ in fixed)
-        return fixed
+        # 行内灰框边缘的空格（框的内边距）：两侧是汉字时去掉
+        out = []
+        for k, (c, f) in enumerate(segs):
+            if c == " " and 0 < k < len(segs) - 1 and not self.code:
+                a, b = segs[k - 1], segs[k + 1]
+                if ("code" in a[1]) != ("code" in b[1]) and is_cjkp(a[0][-1:] or " ") and is_cjkp(b[0][:1] or " "):
+                    continue
+                if is_cjkp(a[0][-1:] or " ") and b[0][:1] in "、，。；：！？）》」』":
+                    continue
+            out.append((c, f))
+        segs = out
+        self.segs = segs
+        self.text = "".join(t for t, _ in segs)
+        return segs
 
 
 def pdf_lines(frags):
@@ -1095,6 +1168,7 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
         return []
     # 页面形状：横线 / 竖条 / 底色矩形
     hlines, vbars, boxes = collections.defaultdict(list), collections.defaultdict(list), collections.defaultdict(list)
+    dots = collections.defaultdict(list)
     for pg, lst in shapes.items():
         pw = pages[pg][0]
         for (x0, y0, x1, y1, lum, op) in lst:
@@ -1107,6 +1181,8 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
                 hlines[pg].append((x0, y0, x1, y1))
             elif w <= 5 and h > 8:
                 vbars[pg].append((x0, y0, x1, y1))
+            elif 2 <= w <= 6 and 2 <= h <= 6 and lum < 60:
+                dots[pg].append((x0, y0, x1, y1))   # 画出来的项目符号
             elif h > 6 and (op < 0.3 or lum > 85):
                 boxes[pg].append((x0, y0, x1, y1))
     # 版心统计
@@ -1120,30 +1196,37 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
     xmaxs = sorted(l.x1 for l in body_lines)
     right = xmaxs[int(len(xmaxs) * 0.9)]
     pitches = collections.Counter()
+    bl = set(map(id, body_lines))
     for a, b in zip(lines, lines[1:]):
-        if a.pg == b.pg and a in body_lines and b in body_lines:
+        # 只统计“写满的行 -> 下一行”的基线距：这是段内行距
+        if a.pg == b.pg and id(a) in bl and id(b) in bl and a.x1 > right - 2 * body_size:
             d = b.base - a.base
             if d > 0:
                 pitches[round(d * 2) / 2] += 1
     # 行距众数
     lh = pitches.most_common(1)[0][0] if pitches else body_size * 1.5
     char_w = body_size
+    print(f"  · {path.name}: 正文 {body_size}pt 行距 {lh}pt 版心 {left:.0f}–{right:.0f}")
 
+    infer_italic(lines)
     # 逐行：形状归类、拼文本
     for l in lines:
         ly0, ly1 = l.top, l.bot
+        l.bar = None
         code_rects = []
         for (x0, y0, x1, y1) in boxes.get(l.pg, []):
             if y0 - 2 <= ly0 and y1 + 2 >= ly1 or (min(y1, ly1) - max(y0, ly0)) > 0.6 * (ly1 - ly0):
-                if (x1 - x0) >= 0.6 * (l.x1 - l.x0) and x0 <= l.x0 + 2:
+                if x0 <= l.x0 + 3 and x1 >= l.x1 - 3:
                     l.cls = "sys"
                 else:
                     code_rects.append((x0, y0, x1, y1))
         for (x0, y0, x1, y1) in vbars.get(l.pg, []):
             if x1 <= l.x0 + 1 and l.x0 - x1 < 20 and (min(y1, ly1) - max(y0, ly0)) > 0:
                 l.cls = l.cls or "q"
-        if l.code and l.cls is None:
-            l.cls = "code"
+                l.bar = (l.pg, x0, y0, x1, y1)
+        if l.code:
+            l.cls = "code"   # 等宽字体的日志行（可能位于引文框内）
+        l.li = any(4 < l.x0 - x1 < 25 and ly0 - 2 <= (y0 + y1) / 2 <= ly1 + 2 for (x0, y0, x1, y1) in dots.get(l.pg, []))
         l.build(code_rects)
         if MISSING in l.text:
             k = l.text.index(MISSING)
@@ -1154,7 +1237,16 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
         if l.cls is None and l.color not in ("#000000", "#333333", "#252525", "#232323", "#222222") \
                 and l.x0 > left + 0.6 * char_w and abs(l.msize - body_size) < 0.6 and re.match(r"#([0-9a-f]{2})\1\1", l.color):
             l.cls = "q"
-    # 系统提示：比正文多缩进 4–8pt（静音区）由底色矩形判定为主
+    # 左竖线框：首行整行粗体的多行框是“区块”（如一切如常“代理期间社交互动概况”），其余是引文
+    groups = collections.defaultdict(list)
+    for l in lines:
+        if l.cls == "q" and l.bar:
+            groups[l.bar].append(l)
+    for bar, ls in groups.items():
+        first = ls[0]
+        if len(ls) >= 3 and all(f.b for f in first.frags if f.text.strip()):
+            for l in ls:
+                l.cls = "box"
 
     # 插图（附录截图）
     imgs = []
@@ -1175,9 +1267,11 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
         nonlocal cur
         if cur:
             keep = cur["cls"] == "code"
-            x, m = rich(cur["segs"], keep_space=keep)
+            x, m = rich(fill_italic(cur["segs"]), keep_space=keep)
             if x:
                 b = mkblock("p", x, m)
+                if cur.get("li"):
+                    b.update(t="li", lvl=0, mk="•")
                 if cur["cls"]:
                     b["cls"] = cur["cls"]
                 b["_ended"] = cur.get("ended")
@@ -1239,7 +1333,7 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
             prev_ended = True
             continue
         indented = prev is not None and abs(l.x0 - prev.x0) > char_w * 0.8
-        newpara = (cur is None or prev_ended or indented or (cur and cur["cls"] != l.cls)
+        newpara = (cur is None or prev_ended or indented or l.li or (cur and cur["cls"] != l.cls)
                    or (gap is not None and gap > 1.18 * lh))
         if cur is not None and newpara:
             cur["ended"] = True
@@ -1252,7 +1346,7 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
                 prev = l
                 prev_ended = True
                 continue
-            cur = {"segs": [], "cls": l.cls}
+            cur = {"segs": [], "cls": l.cls, "li": l.li}
         else:
             # 行间拼接：英文单词间补空格
             pt = "".join(t for t, _ in cur["segs"]).rstrip()
@@ -1269,7 +1363,65 @@ def pdf_blocks(path, pages, frags, images, shapes, ctx, tmp):
         b.pop("_ended", None)
         b.pop("_gap", None)
     blocks = [md_line(b) if b["t"] == "p" else b for b in blocks]
+    # 紧挨标题的分隔线（Markdown 导出的 PDF 常在每节标题前画一条 ---）由标题本身承担
+    out = []
+    for i, b in enumerate(blocks):
+        if b["t"] == "hr" and ((out and out[-1]["t"] in ("h", "hr")) or (i + 1 < len(blocks) and blocks[i + 1]["t"] == "h")):
+            continue
+        out.append(b)
+    blocks = out
     return blocks
+
+
+def infer_italic(lines):
+    """Chromium 导出的 PDF 中，斜体汉字用单独的字体子集（名字与正文相同，如 EAAAAA+Noto-Sans-SC-Thin），
+    只能从它旁边的西文字形是不是 Italic 来判断。"""
+    ital = collections.Counter()
+    reg = collections.Counter()
+    for l in lines:
+        fs = [f for f in l.frags if f.text.strip()]
+        for a, b in zip(fs, fs[1:]):
+            if b.x0 - a.x1 > 3:
+                continue
+            for x, y in ((a, b), (b, a)):
+                if any(is_cjk(c) for c in x.text) and not any(is_cjk(c) for c in y.text):
+                    if y.i:
+                        ital[x.family] += 1
+                    else:
+                        reg[x.family] += 1
+    fams = {f for f in ital if ital[f] >= 2 and ital[f] > 2 * reg[f]}
+    for l in lines:
+        for f in l.frags:
+            if f.family in fams:
+                f.i = True
+
+
+def fill_italic(segs):
+    """PDF 中汉字没有斜体字形（合成倾斜），只有引号/西文是 Italic 字体：
+    把夹在两个斜体片段之间（或段首即斜体时，斜体片段到段尾之间）的纯中文片段也标为斜体。"""
+    chars = [(c, f) for t, f in segs for c in t] if any(len(t) != 1 for t, _ in segs) else list(segs)
+    idx = [i for i, (c, f) in enumerate(chars) if c.strip()]
+    if not idx or not any("i" in chars[i][1] for i in idx):
+        return segs
+    out = [(c, set(f)) for c, f in chars]
+    k = 0
+    n = len(idx)
+    while k < n:
+        if "i" in out[idx[k]][1]:
+            k += 1
+            continue
+        j = k
+        while j < n and "i" not in out[idx[j]][1]:
+            j += 1
+        run = [idx[t] for t in range(k, j)]
+        left_ok = k > 0 and "i" in out[idx[k - 1]][1]
+        right_ok = (j < n and "i" in out[idx[j]][1]) or (j == n and "i" in out[idx[0]][1])
+        pure = all(not re.match(r"[A-Za-z0-9]", out[t][0]) and "b" not in out[t][1] for t in run)
+        if left_ok and right_ok and pure:
+            for t in range(run[0], run[-1] + 1):
+                out[t][1].add("i")
+        k = j
+    return out
 
 
 def extract_image(path, im, pages, ctx, tmp):
@@ -1368,9 +1520,13 @@ def note_rules(blocks):
             continue
         if b["t"] in ("p", "c") and not b.get("cls"):
             full = full_kinds(b)
-            if DIALOG_RE.match(x) or x.endswith(("：", ":")):
+            if DIALOG_RE.match(x):
+                b["t"] = "p"
+                b["m"] = [[0, len(x), "b"]]
                 continue
-            if ("b" in full and len(x) <= 30) or (NOTE_HEAD_RE.match(x) and len(x) <= 30 and not re.search(r"[。，]", x)):
+            if x.endswith(("：", ":")):
+                continue
+            if ("b" in full and len(x) <= 30 and not re.search(r"[。！？]$", x)) or (NOTE_HEAD_RE.match(x) and len(x) <= 30 and not re.search(r"[。，]", x)):
                 b["t"] = "h"
                 drop_kinds(b, {"b"})
     return blocks

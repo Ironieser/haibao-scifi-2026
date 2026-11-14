@@ -149,6 +149,15 @@ def collect_chars():
         for n in c.get("notes", []):
             chars.update(n.get("title", ""))
     chars.update(UI_TEXT)
+    # 非正文页面的全部可见文字（首页、统计、收藏、笔记、404）都可能用展示字体，一并收入子集
+    import html as _html, re as _re
+    for rel in ("index.html", "stats/index.html", "favorites/index.html", "notes/index.html", "404.html"):
+        f = ROOT / "dist" / rel
+        if f.exists():
+            t = f.read_text(encoding="utf-8")
+            t = _re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", t, flags=_re.S)
+            chars.update(_html.unescape(_re.sub(r"<[^>]+>", " ", t)))
+    # 作品页头部（标题、作者、获奖标签、元信息）由 works.json 覆盖；目录与附录标题已在上面收集
     chars.update(PUNCT)
     chars.update(FULLWIDTH)
     chars.update(ASCII)

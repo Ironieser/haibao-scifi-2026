@@ -190,30 +190,43 @@
 
   /* ---------- 首页 ---------- */
   function initHome() {
-    var list = $('#wl');
-    if (!list) return;
-    var rows = $$('.wrow', list);
-    var filter = 'all', sort = 'award', haveStats = false;
-    var sortSel = $('#sort'), countEl = $('#wl-count'), empty = $('#wl-empty');
+    var list = $('#shelf');
+    if (list) initShelf(list);
+    initRecent();
+  }
+
+  // 全部作品书架：筛选、排序；阅读量（/api/views）与点赞评论数（/api/stats）到了才开放对应排序
+  function initShelf(list) {
+    var books = $$('.book', list);
+    var filter = 'all', sort = 'award';
+    var sortSel = $('#sort'), countEl = $('#shelf-count'), empty = $('#shelf-empty');
+    var num = function (b, k) { return parseInt(b.getAttribute('data-' + k) || '0', 10) || 0; };
 
     function apply() {
       var shown = 0;
-      rows.forEach(function (r) {
-        var ok = filter === 'all' || (filter === 'both' && r.getAttribute('data-both') === '1') ||
-          (filter === 'noai' && r.getAttribute('data-ai') === '0');
-        r.hidden = !ok;
+      books.forEach(function (b) {
+        var ok = filter === 'all' || (filter === 'both' && b.getAttribute('data-both') === '1') ||
+          (filter === 'rod' && b.getAttribute('data-rod') === '1') ||
+          (filter === 'noai' && b.getAttribute('data-ai') === '0');
+        b.hidden = !ok;
         if (ok) shown++;
       });
-      var key = function (r) {
-        if (sort === 'likes') return -(parseInt(r.getAttribute('data-likes') || '0', 10));
-        if (sort === 'chars') return -parseInt(r.getAttribute('data-chars'), 10);
+      var key = function (b) {
+        if (sort === 'views') return -num(b, 'views');
+        if (sort === 'likes') return -num(b, 'likes');
+        if (sort === 'short') return num(b, 'chars');
+        if (sort === 'long') return -num(b, 'chars');
         return 0;
       };
-      rows.slice().sort(function (a, b) {
-        return (key(a) - key(b)) || (parseInt(a.getAttribute('data-order'), 10) - parseInt(b.getAttribute('data-order'), 10));
-      }).forEach(function (r) { list.appendChild(r); });
-      if (countEl) countEl.textContent = shown === rows.length ? '共 ' + rows.length + ' 部' : '显示 ' + shown + ' / ' + rows.length + ' 部';
+      books.slice().sort(function (a, b) {
+        return (key(a) - key(b)) || (num(a, 'order') - num(b, 'order'));
+      }).forEach(function (b) { list.appendChild(b); });
+      if (countEl) countEl.textContent = shown === books.length ? '共 ' + books.length + ' 部' : '显示 ' + shown + ' / ' + books.length + ' 部';
       if (empty) empty.hidden = shown > 0;
+    }
+    function enable(v, on) {
+      var o = sortSel && sortSel.querySelector('option[value="' + v + '"]');
+      if (o) o.disabled = !on;
     }
     $$('[data-filter]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -223,34 +236,72 @@
       });
     });
     if (sortSel) {
+      sortSel.value = 'award';
       sortSel.addEventListener('change', function () { sort = sortSel.value; apply(); });
-      var likeOpt = sortSel.querySelector('option[value="likes"]');
-      if (likeOpt) likeOpt.disabled = true;
     }
+    enable('views', false);
+    enable('likes', false);
     apply();
 
     api('GET', '/api/stats').then(function (data) {
       var works = data && data.works;
       if (!works) return;
-      haveStats = true;
-      rows.forEach(function (r) {
-        var s = works[r.getAttribute('data-id')];
+      books.forEach(function (b) {
+        var s = works[b.getAttribute('data-id')];
         if (!s) return;
-        r.setAttribute('data-likes', String(s.likes || 0));
-        $$('[data-stat]', r).forEach(function (n) {
-          var k = n.getAttribute('data-stat');
-          var v = s[k] || 0;
+        b.setAttribute('data-likes', String(s.likes || 0));
+        $$('[data-stat]', b).forEach(function (n) {
+          var v = s[n.getAttribute('data-stat')] || 0;
           $('.n', n).textContent = fmtNum(v);
-          n.hidden = false;
+          n.hidden = !v; // 0 不显示
         });
       });
-      $$('.wl-head [data-stat]').forEach(function (n) { n.hidden = false; });
-      if (sortSel) {
-        var o = sortSel.querySelector('option[value="likes"]');
-        if (o) o.disabled = false;
-      }
+      enable('likes', true);
       if (sort === 'likes') apply();
     }, function () { /* 计数保持隐藏 */ });
+
+    // 数字本身由 views.js 填进 [data-views-page]；这里只取排序用的数据（同一接口有边缘缓存）
+    api('GET', '/api/views').then(function (data) {
+      var pages = data && data.pages;
+      if (!pages) return;
+      books.forEach(function (b) { b.setAttribute('data-views', String(pages[b.getAttribute('data-id')] || 0)); });
+      enable('views', true);
+      if (sort === 'views') apply();
+    }, function () {});
+  }
+
+  // 最新讨论：有评论才显示整个区块
+  function initRecent() {
+    var sec = $('#recent'), box = $('#recent-list');
+    if (!sec || !box) return;
+    var titles = {};
+    $$('.book').forEach(function (b) {
+      var t = $('.b-t', b);
+      if (t) titles[b.getAttribute('data-id')] = t.textContent;
+    });
+    api('GET', '/api/comments/recent').then(function (data) {
+      var cs = (data && Array.isArray(data.comments) ? data.comments : []).filter(function (c) {
+        return c && titles[c.work] && typeof c.body === 'string';
+      }).slice(0, 8);
+      if (!cs.length) return;
+      box.innerHTML = '';
+      cs.forEach(function (c) {
+        var li = el('li'), a = el('a');
+        a.href = '/works/' + encodeURIComponent(c.work) + '/#talk';
+        var h = el('span', 'rc-h');
+        h.appendChild(el('b', null, String(c.name || '匿名读者')));
+        h.appendChild(D.createTextNode(' 在'));
+        h.appendChild(el('span', 'w', '《' + titles[c.work] + '》'));
+        h.appendChild(D.createTextNode('下说：'));
+        var when = fmtTime(c.created);
+        if (when) h.appendChild(el('span', 'rc-t', when));
+        a.appendChild(h);
+        a.appendChild(el('span', 'rc-b', c.body));
+        li.appendChild(a);
+        box.appendChild(li);
+      });
+      sec.hidden = false;
+    }, function () { /* 区块保持隐藏 */ });
   }
 
   /* ---------- 作品页 ---------- */
