@@ -849,6 +849,7 @@ def build_home(ctx, meta, works, by_id, hero_art=None):
 <ol class="recent" id="recent-list"></ol>
 </section>
 
+{commentary_home_html(load_commentary())}
 <section class="sec wrap about" id="about" aria-labelledby="about-h">
 <h2 class="sec-h" id="about-h">关于这次征文</h2>
 <div class="about-in">
@@ -862,6 +863,67 @@ def build_home(ctx, meta, works, by_id, hero_art=None):
 </main>"""
     desc = (f"{c['name']}获奖作品集：{len(works)} 部作品，人类评委与 AI 评委两份名单，奖金合计 {money(total)} 元。在线阅读、下载与讨论。")
     write(DIST / "index.html", shell(ctx, title=f"{c['name']}获奖作品集", desc=desc, path="/", page="home", body=body))
+
+
+# ---------------------------------------------------------------- 督工点评（data/commentary.json）
+def load_commentary():
+    f = ROOT / "data" / "commentary.json"
+    return json.loads(f.read_text("utf-8")) if f.exists() else None
+
+
+def ts_link(src, t, label=None):
+    m, sec = divmod(int(t), 60)
+    lab = label or f"{m:02d}:{sec:02d}"
+    return (f'<a class="cm-t" href="{esc(src["url"])}?t={int(t)}" target="_blank" rel="noopener">'
+            f'在视频中观看 {lab}<span class="sr">，在新窗口打开 B 站</span></a>')
+
+
+def commentary_work_html(cm, w):
+    """作品页「督工点评」：有单独点评的显示摘要与引语；其余显示所属奖级在节目中的位置。"""
+    if not cm:
+        return ""
+    src = cm["source"]
+    items = cm["works"].get(w["id"], [])
+    rows = []
+    for it in items:
+        q = ""
+        if it.get("quote"):
+            ref = f' <a class="cm-ref" href="#p-{it["quoteRef"]}">在正文中查看</a>' if it.get("quoteRef") else ""
+            q = f'<blockquote class="cm-q"><p>{esc(it["quote"])}</p></blockquote><p class="cm-qref">{ref}</p>' if ref else \
+                f'<blockquote class="cm-q"><p>{esc(it["quote"])}</p></blockquote>'
+        rows.append(f'<div class="cm-item"><p>{esc(it["text"])}</p>{q}<p class="cm-foot">{ts_link(src, it["t"])}</p></div>')
+    if not rows:
+        juries = {a["jury"] for a in w["awards"]}
+        tiers = {(a["jury"], a.get("tier")) for a in w["awards"]}
+        notes = []
+        if any(j == "human" for j in juries):
+            notes.append(cm["tiers"]["human-third"])
+        if "ai" in juries:
+            notes.append(cm["tiers"]["ai"])
+        if "rod" in juries:
+            notes.append(cm["tiers"]["rod"])
+        if not notes:
+            return ""
+        rows = [f'<div class="cm-item cm-thin"><p>{esc(n["text"])}</p><p class="cm-foot">{ts_link(src, n["t"])}</p></div>'
+                for n in notes]
+    return (f'<section class="cm" aria-labelledby="cm-h"><h2 class="cm-h" id="cm-h">督工点评</h2>{"".join(rows)}'
+            f'<p class="cm-src">摘自{esc(src["host"])}《{esc(src["title"].split("】")[-1])}》（{esc(src["date"])}），'
+            f'<a href="{esc(src["url"])}" target="_blank" rel="noopener">B 站原视频</a>。{esc(src["note"])}</p></section>')
+
+
+def commentary_home_html(cm):
+    if not cm:
+        return ""
+    src = cm["source"]
+    items = "".join(
+        f'<li><h3 class="cmo-h">{esc(o["title"])}</h3><p>{esc(o["text"])}</p>'
+        + (f'<p class="cmo-q">「{esc(o["quote"])}」</p>' if o.get("quote") else "")
+        + f'<p class="cm-foot">{ts_link(src, o["t"])}</p></li>' for o in cm["overall"])
+    return (f'<section class="sec wrap cmo" id="review" aria-labelledby="cmo-h">'
+            f'<h2 class="sec-h" id="cmo-h">督工怎么说</h2>'
+            f'<p class="sec-intro">颁奖节目《睡前消息》第 1130 期里，{esc(src["host"])}谈了 AI 时代的写作，也解释了评奖标准与 AI 评委的由来。'
+            f'<a href="{esc(src["url"])}" target="_blank" rel="noopener">看原视频</a>。{esc(src["note"])}</p>'
+            f'<ol class="cmo-list">{items}</ol></section>')
 
 
 # ---------------------------------------------------------------- work page
@@ -950,6 +1012,7 @@ def build_work(ctx, meta, works, by_id, w):
 <div class="col">
 <div class="resume" id="resume" hidden><p>上次读到 <b class="pct"></b>。</p><button type="button" class="btn btn-primary go">继续上次阅读</button><button type="button" class="x">从头读</button></div>
 {stmt}
+{commentary_work_html(load_commentary(), w)}
 {toc_html}
 <div class="prose" id="text" data-chars="{w['chars']}">
 {body_html}
