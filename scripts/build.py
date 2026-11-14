@@ -536,6 +536,7 @@ def footer(ctx):
 <p class="foot-views" data-views-box hidden>全站累计浏览 <b data-views="total"></b> 次，今日 <b data-views="today-uv"></b> 位读者。<a href="/stats/">访问统计</a></p>
 <p>作品版权归作者所有，本站仅供阅读与交流。</p>
 <p class="foot-contact">发现错字、排版问题，或有建议？<a class="js-mail" data-u="ironieser" data-d="gmail.com" data-s="海豹杯作品站反馈" href="#">给网站开发者留言</a><noscript>：ironieser [at] gmail.com</noscript></p>
+<p class="foot-gh">本站代码开源：<a href="https://github.com/Ironieser/haibao-scifi-2026" target="_blank" rel="noopener">GitHub 仓库<span class="sr">，在新窗口打开</span></a>，觉得有用欢迎点个 Star。</p>
 <p class="foot-font">展示字体：得意黑（<a href="/assets/fonts/OFL.txt">OFL</a>）。</p>
 <div class="theme-sw js-only" role="group" aria-label="外观"><span>外观</span>
 <button type="button" data-pref="theme" data-val="auto">跟随系统</button><button type="button" data-pref="theme" data-val="light">浅色</button><button type="button" data-pref="theme" data-val="dark">深色</button></div>

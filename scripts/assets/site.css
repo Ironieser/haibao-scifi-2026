@@ -731,3 +731,4 @@ html.sh-open .toast { z-index: 95; }
 @media (min-width: 720px) { .cmo-list li:nth-child(odd) { padding-right: 28px; } }
 .foot-contact a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
 .foot-contact .mail-addr { color: var(--muted); font-size: 14px; word-break: break-all; }
+.foot-gh a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }

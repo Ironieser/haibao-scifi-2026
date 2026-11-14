@@ -1,0 +1,27 @@
+MIT License（仅适用于本仓库的代码、样式、脚本与原创插画）
+
+Copyright (c) 2026 Ironieser
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+不适用 MIT 许可的内容：
+- content/works/ 与 dist/downloads/ 中的获奖小说正文及作者创作说明：版权归各作品作者所有。
+- data/commentary.json 中的节目点评摘要：引自《睡前消息》第 1130 期，版权归原节目所有。
+- 展示字体「得意黑」子集：SIL Open Font License 1.1（见 dist/assets/fonts/OFL.txt）。
