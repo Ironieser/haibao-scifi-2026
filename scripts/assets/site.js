@@ -999,6 +999,17 @@
   W.HB = { toast: toast, api: api, hit: hit, copyText: copyText, device: device, jget: jget, jset: jset, el: el, prefs: prefs, savePrefs: savePrefs,
     readPos: readPos, keepPosition: function (fn) { keepPosition(fn); } };
 
+  // 页脚「给网站开发者留言」：邮箱地址由脚本拼出，减少被爬虫收集
+  D.querySelectorAll('a.js-mail').forEach(function (a) {
+    var addr = a.getAttribute('data-u') + '@' + a.getAttribute('data-d');
+    var page = location.origin + location.pathname;
+    a.href = 'mailto:' + addr + '?subject=' + encodeURIComponent(a.getAttribute('data-s') || '') +
+      '&body=' + encodeURIComponent('\r\n\r\n——\r\n来自页面：' + page);
+    a.title = addr;
+    var tail = el('span', 'mail-addr', '（' + addr + '）');
+    a.after(tail);
+  });
+
   device();
   hit();  // 尽早发出（不等各区块初始化）
   initDownloads();
